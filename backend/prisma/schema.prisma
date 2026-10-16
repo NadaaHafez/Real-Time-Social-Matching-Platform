@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client"
+  // Build output, gitignored. Outside src/, which is hand-written code.
+  output   = "../generated/prisma"
+}
+
+// `yarn prisma:generate` also writes a Zod schema for every enum and model below into
+// packages/shared/src/generated/prisma.ts. `///` comments become their descriptions.
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This app's own role. Never Pi's platform roles.
+enum UserRole {
+  user
+  moderator
+  owner
+}
+
+/// `suspended` is reversible, `banned` is not. Both block sign-in and every request.
+enum UserStatus {
+  active
+  suspended
+  banned
+}
+
+/// A signed-in Pi account.
+model User {
+  id       String @id @default(uuid())
+  /// Pi account uid, the stable identity. Never the username, which can change.
+  piUserId String @unique @map("pi_user_id")
+  username String
+
+  role   UserRole   @default(user)
+  status UserStatus @default(active)
+
+  /// When a suspension stops applying. Nothing sweeps it: the auth check treats a passed
+  /// date as active and clears it. Null on a ban, which never ends.
+  suspendedUntil DateTime? @map("suspended_until")
+
+  /// Set once onboarding is finished. Null means the client routes to onboarding.
+  onboardedAt DateTime? @map("onboarded_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  /// Soft delete. See the extension in src/config/database.ts.
+  deletedAt DateTime? @map("deleted_at")
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+/// One signed-in device. The token itself is never stored, only its SHA-256, so a leaked
+/// database cannot be replayed as sessions.
+model RefreshToken {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+
+  /// Set on sign-out and on rotation. A revoked token presented again is a stolen copy
+  /// being replayed, and revokes every token the user has.
+  revokedAt    DateTime? @map("revoked_at")
+  /// The token this one was rotated into. Null if it was revoked by sign-out.
+  replacedById String?   @map("replaced_by_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

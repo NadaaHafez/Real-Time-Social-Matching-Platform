@@ -1,0 +1,26 @@
+{
+  "name": "pi-chat-roulette",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Random 1-on-1 text chat inside the Pi Browser, funded by Pi. Backend + shared contract.",
+  "workspaces": [
+    "backend",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:shared": "yarn workspace @chat-roulette/shared build",
+    "build": "yarn build:shared && yarn workspace @chat-roulette/backend build",
+    "dev": "yarn build:shared && yarn workspace @chat-roulette/backend dev",
+    "prisma:generate": "yarn workspace @chat-roulette/backend prisma:generate",
+    "typecheck": "yarn build:shared && yarn workspaces run typecheck"
+  },
+  "//": "One copy of the Express types. @types/swagger-ui-express otherwise nests @types/express v5 next to our v4, and the two are nominally different types.",
+  "resolutions": {
+    "@types/express": "^4.17.21",
+    "@types/express-serve-static-core": "^4.19.6"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "yarn@1.22.22"
+}

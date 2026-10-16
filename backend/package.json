@@ -1,0 +1,41 @@
+{
+  "name": "@chat-roulette/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pi Network Chat Roulette - backend API",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/src/index.js",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate && ts-node --transpile-only scripts/generate-shared-schemas.ts",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "docs:emit": "ts-node --transpile-only scripts/emit-docs.ts"
+  },
+  "dependencies": {
+    "@chat-roulette/shared": "0.1.0",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@prisma/internals": "^7.9.1",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.7",
+    "@types/swagger-ui-express": "^4.1.8",
+    "prisma": "^7.9.1",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.3"
+  }
+}

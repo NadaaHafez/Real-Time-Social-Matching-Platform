@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+*.log
+*.tsbuildinfo
+
+# Prisma client output, from `yarn prisma:generate`.
+backend/generated/
+
+# From `yarn docs:emit`. The server serves the same document at /api-docs.json.
+backend/openapi.json
+
+# Local Claude Code settings.
+.claude/

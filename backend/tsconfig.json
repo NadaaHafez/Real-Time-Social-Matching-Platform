@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // `.` rather than `src` because the Prisma client is generated into ../generated.
+    // Shared is consumed as a built package (dist), so it never joins this emit and the
+    // entry point stays at dist/src/index.js.
+    "rootDir": ".",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*", "generated/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
