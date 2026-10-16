@@ -1,6 +1,7 @@
 import env from "../config/env";
 import { authRoutePaths } from "../routes/auth/auth.routes";
 import { healthRoutePaths } from "../routes/health/health.routes";
+import { profileRoutePaths } from "../routes/profile/profile.routes";
 import { getSchemaRegistry } from "./defineRoute";
 import { generateSchemaComponents } from "./zodToOpenApi";
 
@@ -14,10 +15,10 @@ import { generateSchemaComponents } from "./zodToOpenApi";
  */
 
 const DESCRIPTION = `
-REST API for the Pi Network Chat Roulette app.
+REST API for the Real-Time Social Matching Platform, a Pi Network app.
 
 **Generated from the code.** Request and response schemas are the same Zod objects the
-server validates with, imported from \`@chat-roulette/shared\` — the package clients use too.
+server validates with, imported from \`@social-matching/shared\` — the package clients use too.
 
 ## Authentication
 
@@ -42,11 +43,12 @@ const errorRef = (description: string) => ({
 const paths = {
   ...healthRoutePaths,
   ...authRoutePaths,
+  ...profileRoutePaths,
 };
 
 export const swaggerSpec = {
   openapi: "3.0.0",
-  info: { title: "Chat Roulette API", version: "0.1.0", description: DESCRIPTION },
+  info: { title: "Social Matching API", version: "0.1.0", description: DESCRIPTION },
   servers: [
     { url: "/", description: "This server" },
     { url: `http://localhost:${env.port}`, description: "Local development" },

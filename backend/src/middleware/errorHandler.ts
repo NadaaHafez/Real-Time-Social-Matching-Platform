@@ -1,4 +1,4 @@
-import type { ApiError } from "@chat-roulette/shared";
+import type { ApiError } from "@social-matching/shared";
 import { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 

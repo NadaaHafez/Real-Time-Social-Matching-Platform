@@ -21,6 +21,13 @@ export const userStatusSchema = z.enum(["active", "suspended", "banned"]).descri
 export type UserStatus = z.infer<typeof userStatusSchema>;
 export const UserStatus = userStatusSchema.enum;
 
+/**
+ * Self-declared at onboarding.
+ */
+export const genderSchema = z.enum(["male", "female", "other"]).describe("Self-declared at onboarding.");
+export type Gender = z.infer<typeof genderSchema>;
+export const Gender = genderSchema.enum;
+
 // ============================================================================
 // MODELS (database shape: scalars only, Date objects)
 // ============================================================================
@@ -35,6 +42,21 @@ export const userModelSchema = z.object({
    */
   piUserId: z.string().describe("Pi account uid, the stable identity. Never the username, which can change."),
   username: z.string(),
+  /**
+   * Self-declared at onboarding, never below Settings.minimumAge. A number rather than a
+   * date of birth because matching filters on an age range.
+   */
+  age: z.number().int().nullable().describe("Self-declared at onboarding, never below Settings.minimumAge. A number rather than a\ndate of birth because matching filters on an age range."),
+  gender: genderSchema.nullable(),
+  /**
+   * ISO 3166-1 alpha-2, uppercase. Checked against the shared country list, not a table.
+   */
+  country: z.string().nullable().describe("ISO 3166-1 alpha-2, uppercase. Checked against the shared country list, not a table."),
+  /**
+   * Opening line the client pre-fills into the composer when a chat starts. The user still
+   * presses send, so it arrives as an ordinary, reportable message.
+   */
+  iceBreaker: z.string().nullable().describe("Opening line the client pre-fills into the composer when a chat starts. The user still\npresses send, so it arrives as an ordinary, reportable message."),
   role: userRoleSchema,
   status: userStatusSchema,
   /**
@@ -43,9 +65,10 @@ export const userModelSchema = z.object({
    */
   suspendedUntil: z.date().nullable().describe("When a suspension stops applying. Nothing sweeps it: the auth check treats a passed\ndate as active and clears it. Null on a ban, which never ends."),
   /**
-   * Set once onboarding is finished. Null means the client routes to onboarding.
+   * Set the first time age, gender and country are all filled in. Null means the client
+   * routes to onboarding.
    */
-  onboardedAt: z.date().nullable().describe("Set once onboarding is finished. Null means the client routes to onboarding."),
+  onboardedAt: z.date().nullable().describe("Set the first time age, gender and country are all filled in. Null means the client\nroutes to onboarding."),
   createdAt: z.date(),
   updatedAt: z.date(),
   /**
@@ -77,6 +100,20 @@ export const refreshTokenModelSchema = z.object({
 }).describe("One signed-in device. The token itself is never stored, only its SHA-256, so a leaked\ndatabase cannot be replayed as sessions.");
 export type RefreshTokenModel = z.infer<typeof refreshTokenModelSchema>;
 
+/**
+ * App-wide policy an admin can change without a deploy. Exactly one row, id 1, created
+ * with these defaults the first time it is read.
+ */
+export const settingsModelSchema = z.object({
+  id: z.number().int(),
+  /**
+   * Onboarding refuses anyone younger.
+   */
+  minimumAge: z.number().int().describe("Onboarding refuses anyone younger."),
+  updatedAt: z.date(),
+}).describe("App-wide policy an admin can change without a deploy. Exactly one row, id 1, created\nwith these defaults the first time it is read.");
+export type SettingsModel = z.infer<typeof settingsModelSchema>;
+
 // ============================================================================
 // OPENAPI COMPONENTS
 // ============================================================================
@@ -85,4 +122,5 @@ export type RefreshTokenModel = z.infer<typeof refreshTokenModelSchema>;
 export const prismaEnumSchemaComponents = {
   UserRole: userRoleSchema,
   UserStatus: userStatusSchema,
+  Gender: genderSchema,
 };

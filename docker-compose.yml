@@ -1,0 +1,25 @@
+# Local Postgres. Start: `docker compose up -d`. Wipe: `docker compose down -v`.
+
+# Fixed name, so renaming the folder keeps the same volume.
+name: social-matching
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: social_matching
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    # 5433 to avoid clashing with another local Postgres.
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d social_matching"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

@@ -1,4 +1,4 @@
-import type { AuthTokens, RefreshTokenRequest, SignInRequest, SignInResponse } from "@chat-roulette/shared";
+import type { AuthTokens, RefreshTokenRequest, SignInRequest, SignInResponse } from "@social-matching/shared";
 
 import * as authService from "../../services/auth/auth.service";
 import { asyncHandler } from "../../utils/asyncHandler";

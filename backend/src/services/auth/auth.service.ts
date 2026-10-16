@@ -1,4 +1,4 @@
-import type { AuthTokens, PiAuthResult, SignInResponse, UserStatus } from "@chat-roulette/shared";
+import type { AuthTokens, PiAuthResult, SignInResponse, UserStatus } from "@social-matching/shared";
 
 import prisma from "../../config/database";
 import logger from "../../config/logger";

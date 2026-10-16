@@ -1,5 +1,5 @@
 {
-  "name": "@chat-roulette/shared",
+  "name": "@social-matching/shared",
   "version": "0.1.0",
   "private": true,
   "description": "The API contract: Zod schemas shared by the backend and any client. Types are inferred from them, never written by hand.",

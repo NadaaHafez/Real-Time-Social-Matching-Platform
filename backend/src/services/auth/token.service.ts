@@ -1,4 +1,4 @@
-import type { AuthTokens } from "@chat-roulette/shared";
+import type { AuthTokens } from "@social-matching/shared";
 import { createHash, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 
@@ -18,8 +18,8 @@ import { HttpError } from "../../utils/httpError";
  * third-party, and WebKit (every iOS browser) refuses those outright.
  */
 
-const ISSUER = "chat-roulette-api";
-const AUDIENCE = "chat-roulette-app";
+const ISSUER = "social-matching-api";
+const AUDIENCE = "social-matching-app";
 const ALGORITHM = "HS256";
 
 export interface AccessTokenClaims {

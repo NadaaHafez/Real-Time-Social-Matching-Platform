@@ -1,5 +1,5 @@
 {
-  "name": "pi-chat-roulette",
+  "name": "real-time-social-matching-platform",
   "private": true,
   "version": "0.1.0",
   "description": "Random 1-on-1 text chat inside the Pi Browser, funded by Pi. Backend + shared contract.",
@@ -8,10 +8,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build:shared": "yarn workspace @chat-roulette/shared build",
-    "build": "yarn build:shared && yarn workspace @chat-roulette/backend build",
-    "dev": "yarn build:shared && yarn workspace @chat-roulette/backend dev",
-    "prisma:generate": "yarn workspace @chat-roulette/backend prisma:generate",
+    "build:shared": "yarn workspace @social-matching/shared build",
+    "build": "yarn build:shared && yarn workspace @social-matching/backend build",
+    "dev": "yarn build:shared && yarn workspace @social-matching/backend dev",
+    "prisma:generate": "yarn workspace @social-matching/backend prisma:generate",
     "typecheck": "yarn build:shared && yarn workspaces run typecheck"
   },
   "//": "One copy of the Express types. @types/swagger-ui-express otherwise nests @types/express v5 next to our v4, and the two are nominally different types.",

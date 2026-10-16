@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+import { COUNTRY_CODES } from "../constants/countries";
+
+// ============================================================================
+// SHARED FIELDS
+// ============================================================================
+
+/** Profiles now, match filters later. Exact uppercase codes from COUNTRIES; "eg" is refused. */
+export const countryCodeSchema = z
+  // Without the errorMap, Zod's message lists every code in COUNTRIES.
+  .enum(COUNTRY_CODES, { errorMap: () => ({ message: "Not a supported country code" }) })
+  .describe("ISO 3166-1 alpha-2, uppercase, from the shared COUNTRIES list.");
+
 // ============================================================================
 // ERROR ENVELOPE
 // ============================================================================
@@ -19,5 +31,6 @@ export type ApiError = z.infer<typeof errorSchema>;
 // ============================================================================
 
 export const commonSchemaComponents = {
+  CountryCode: countryCodeSchema,
   Error: errorSchema,
 };

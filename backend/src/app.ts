@@ -44,7 +44,7 @@ app.use(
   ...swaggerUi.serve,
   swaggerUi.setup(undefined, {
     swaggerUrl: "/api-docs.json",
-    customSiteTitle: "Chat Roulette API",
+    customSiteTitle: "Social Matching API",
     swaggerOptions: { persistAuthorization: true, displayRequestDuration: true },
   }),
 );

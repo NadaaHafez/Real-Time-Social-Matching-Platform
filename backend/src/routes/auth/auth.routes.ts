@@ -5,7 +5,7 @@ import {
   signInRequestSchema,
   signInResponseSchema,
   authTokensSchema,
-} from "@chat-roulette/shared";
+} from "@social-matching/shared";
 
 import * as authController from "../../controllers/auth/auth.controller";
 import { buildRouteSpec, errorResponse } from "../../docs/defineRoute";

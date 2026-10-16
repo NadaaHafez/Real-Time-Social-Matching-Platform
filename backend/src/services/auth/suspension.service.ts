@@ -1,4 +1,4 @@
-import type { UserStatus } from "@chat-roulette/shared";
+import type { UserStatus } from "@social-matching/shared";
 
 import prisma from "../../config/database";
 

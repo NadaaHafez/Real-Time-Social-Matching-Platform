@@ -25,12 +25,30 @@ enum UserStatus {
   banned
 }
 
+/// Self-declared at onboarding.
+enum Gender {
+  male
+  female
+  other
+}
+
 /// A signed-in Pi account.
 model User {
   id       String @id @default(uuid())
   /// Pi account uid, the stable identity. Never the username, which can change.
   piUserId String @unique @map("pi_user_id")
   username String
+
+  /// Self-declared at onboarding, never below Settings.minimumAge. A number rather than a
+  /// date of birth because matching filters on an age range.
+  age     Int?
+  gender  Gender?
+  /// ISO 3166-1 alpha-2, uppercase. Checked against the shared country list, not a table.
+  country String? @db.Char(2)
+
+  /// Opening line the client pre-fills into the composer when a chat starts. The user still
+  /// presses send, so it arrives as an ordinary, reportable message.
+  iceBreaker String? @map("ice_breaker")
 
   role   UserRole   @default(user)
   status UserStatus @default(active)
@@ -39,7 +57,8 @@ model User {
   /// date as active and clears it. Null on a ban, which never ends.
   suspendedUntil DateTime? @map("suspended_until")
 
-  /// Set once onboarding is finished. Null means the client routes to onboarding.
+  /// Set the first time age, gender and country are all filled in. Null means the client
+  /// routes to onboarding.
   onboardedAt DateTime? @map("onboarded_at")
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -72,4 +91,17 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+/// App-wide policy an admin can change without a deploy. Exactly one row, id 1, created
+/// with these defaults the first time it is read.
+model Settings {
+  id Int @id @default(1)
+
+  /// Onboarding refuses anyone younger.
+  minimumAge Int @default(18) @map("minimum_age")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
 }

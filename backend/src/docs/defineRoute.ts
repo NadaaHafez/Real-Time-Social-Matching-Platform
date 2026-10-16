@@ -1,4 +1,4 @@
-import { allSchemaComponents } from "@chat-roulette/shared";
+import { allSchemaComponents } from "@social-matching/shared";
 import { z } from "zod";
 
 import { zodToOpenApiSchema } from "./zodToOpenApi";

@@ -1,8 +1,8 @@
 {
-  "name": "@chat-roulette/backend",
+  "name": "@social-matching/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Pi Network Chat Roulette - backend API",
+  "description": "Real-Time Social Matching Platform - backend API",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
@@ -14,7 +14,7 @@
     "docs:emit": "ts-node --transpile-only scripts/emit-docs.ts"
   },
   "dependencies": {
-    "@chat-roulette/shared": "0.1.0",
+    "@social-matching/shared": "0.1.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "axios": "^1.7.9",
