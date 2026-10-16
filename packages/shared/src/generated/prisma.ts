@@ -28,6 +28,13 @@ export const genderSchema = z.enum(["male", "female", "other"]).describe("Self-d
 export type Gender = z.infer<typeof genderSchema>;
 export const Gender = genderSchema.enum;
 
+/**
+ * What a ledger entry records. More types arrive with matchmaking, filters and payments.
+ */
+export const ledgerEntryTypeSchema = z.enum(["welcome", "bonus"]).describe("What a ledger entry records. More types arrive with matchmaking, filters and payments.");
+export type LedgerEntryType = z.infer<typeof ledgerEntryTypeSchema>;
+export const LedgerEntryType = ledgerEntryTypeSchema.enum;
+
 // ============================================================================
 // MODELS (database shape: scalars only, Date objects)
 // ============================================================================
@@ -110,9 +117,57 @@ export const settingsModelSchema = z.object({
    * Onboarding refuses anyone younger.
    */
   minimumAge: z.number().int().describe("Onboarding refuses anyone younger."),
+  /**
+   * One-time grant after onboarding.
+   */
+  welcomeRolls: z.number().int().describe("One-time grant after onboarding."),
+  /**
+   * Rolls per streak day, day 1 first. Its length is the cycle; after the last day it restarts.
+   */
+  streakRewards: z.array(z.number().int()).describe("Rolls per streak day, day 1 first. Its length is the cycle; after the last day it restarts."),
   updatedAt: z.date(),
 }).describe("App-wide policy an admin can change without a deploy. Exactly one row, id 1, created\nwith these defaults the first time it is read.");
 export type SettingsModel = z.infer<typeof settingsModelSchema>;
+
+/**
+ * A user's Rolls. Only ledger.service writes here, always with a ledger entry.
+ */
+export const balanceModelSchema = z.object({
+  userId: z.string(),
+  /**
+   * Spendable now.
+   */
+  available: z.number().int().describe("Spendable now."),
+  /**
+   * Reserved by an in-flight roll: not spendable, not yet spent.
+   */
+  held: z.number().int().describe("Reserved by an in-flight roll: not spendable, not yet spent."),
+  updatedAt: z.date(),
+}).describe("A user's Rolls. Only ledger.service writes here, always with a ledger entry.");
+export type BalanceModel = z.infer<typeof balanceModelSchema>;
+
+/**
+ * Append-only record of every Roll movement. available + held always equals the sum of amount.
+ */
+export const ledgerEntryModelSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  type: ledgerEntryTypeSchema,
+  /**
+   * Signed: positive credits, negative debits.
+   */
+  amount: z.number().int().describe("Signed: positive credits, negative debits."),
+  /**
+   * Free-text context, like `onboarding` or `streak:day:3`.
+   */
+  ref: z.string().nullable().describe("Free-text context, like `onboarding` or `streak:day:3`."),
+  /**
+   * Unique, so a retried request can never apply the same movement twice.
+   */
+  idempotencyKey: z.string().nullable().describe("Unique, so a retried request can never apply the same movement twice."),
+  createdAt: z.date(),
+}).describe("Append-only record of every Roll movement. available + held always equals the sum of amount.");
+export type LedgerEntryModel = z.infer<typeof ledgerEntryModelSchema>;
 
 // ============================================================================
 // OPENAPI COMPONENTS
@@ -123,4 +178,5 @@ export const prismaEnumSchemaComponents = {
   UserRole: userRoleSchema,
   UserStatus: userStatusSchema,
   Gender: genderSchema,
+  LedgerEntryType: ledgerEntryTypeSchema,
 };

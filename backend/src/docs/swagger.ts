@@ -3,6 +3,7 @@ import { authRoutePaths } from "../routes/auth/auth.routes";
 import { devRoutePaths } from "../routes/dev/dev.routes";
 import { healthRoutePaths } from "../routes/health/health.routes";
 import { profileRoutePaths } from "../routes/profile/profile.routes";
+import { rollsRoutePaths } from "../routes/rolls/rolls.routes";
 import { getSchemaRegistry } from "./defineRoute";
 import { generateSchemaComponents } from "./zodToOpenApi";
 
@@ -45,6 +46,7 @@ const paths = {
   ...healthRoutePaths,
   ...authRoutePaths,
   ...profileRoutePaths,
+  ...rollsRoutePaths,
   // Documented only where app.ts mounts it.
   ...(env.isProduction ? {} : devRoutePaths),
 };
@@ -60,6 +62,7 @@ export const swaggerSpec = {
     { name: "Health", description: "Liveness and database reachability." },
     { name: "Auth", description: "Pi sign-in, token refresh and sign-out." },
     { name: "Profile", description: "The signed-in user's own profile." },
+    { name: "Rolls", description: "The in-app currency: balance, history, welcome grant and daily streak." },
     ...(env.isProduction ? [] : [{ name: "Dev", description: "Development only. Not mounted in production." }]),
   ],
   components: {

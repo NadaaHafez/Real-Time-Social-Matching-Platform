@@ -67,6 +67,8 @@ model User {
   deletedAt DateTime? @map("deleted_at")
 
   refreshTokens RefreshToken[]
+  balance       Balance?
+  ledgerEntries LedgerEntry[]
 
   @@map("users")
 }
@@ -101,7 +103,57 @@ model Settings {
   /// Onboarding refuses anyone younger.
   minimumAge Int @default(18) @map("minimum_age")
 
+  /// One-time grant after onboarding.
+  welcomeRolls  Int   @default(3) @map("welcome_rolls")
+  /// Rolls per streak day, day 1 first. Its length is the cycle; after the last day it restarts.
+  streakRewards Int[] @default([1, 1, 1, 1, 1, 1, 3]) @map("streak_rewards")
+
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+/// What a ledger entry records. More types arrive with matchmaking, filters and payments.
+enum LedgerEntryType {
+  /// The one-time grant after onboarding.
+  welcome
+  /// Free Rolls outside a purchase, like a daily streak claim.
+  bonus
+}
+
+/// A user's Rolls. Only ledger.service writes here, always with a ledger entry.
+model Balance {
+  userId String @id @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Spendable now.
+  available Int @default(0)
+  /// Reserved by an in-flight roll: not spendable, not yet spent.
+  held      Int @default(0)
+
+  // The default lets the ledger create the row with a raw INSERT.
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("balances")
+}
+
+/// Append-only record of every Roll movement. available + held always equals the sum of amount.
+model LedgerEntry {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type   LedgerEntryType
+  /// Signed: positive credits, negative debits.
+  amount Int
+  /// Free-text context, like `onboarding` or `streak:day:3`.
+  ref    String?
+
+  /// Unique, so a retried request can never apply the same movement twice.
+  idempotencyKey String? @unique @map("idempotency_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("ledger_entries")
 }

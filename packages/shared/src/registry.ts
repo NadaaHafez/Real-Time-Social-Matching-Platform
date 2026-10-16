@@ -4,6 +4,7 @@ import { prismaEnumSchemaComponents } from "./generated/prisma";
 import { authSchemaComponents } from "./schemas/auth.schema";
 import { commonSchemaComponents } from "./schemas/common.schema";
 import { profileSchemaComponents } from "./schemas/profile.schema";
+import { rollsSchemaComponents } from "./schemas/rolls.schema";
 
 /**
  * Every named schema, for the backend's OpenAPI builder. Add each feature's
@@ -14,4 +15,5 @@ export const allSchemaComponents: Record<string, ZodTypeAny> = {
   ...commonSchemaComponents,
   ...authSchemaComponents,
   ...profileSchemaComponents,
+  ...rollsSchemaComponents,
 };
