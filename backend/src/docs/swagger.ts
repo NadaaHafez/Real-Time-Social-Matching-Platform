@@ -1,5 +1,6 @@
 import env from "../config/env";
 import { authRoutePaths } from "../routes/auth/auth.routes";
+import { devRoutePaths } from "../routes/dev/dev.routes";
 import { healthRoutePaths } from "../routes/health/health.routes";
 import { profileRoutePaths } from "../routes/profile/profile.routes";
 import { getSchemaRegistry } from "./defineRoute";
@@ -44,6 +45,8 @@ const paths = {
   ...healthRoutePaths,
   ...authRoutePaths,
   ...profileRoutePaths,
+  // Documented only where app.ts mounts it.
+  ...(env.isProduction ? {} : devRoutePaths),
 };
 
 export const swaggerSpec = {
@@ -56,6 +59,8 @@ export const swaggerSpec = {
   tags: [
     { name: "Health", description: "Liveness and database reachability." },
     { name: "Auth", description: "Pi sign-in, token refresh and sign-out." },
+    { name: "Profile", description: "The signed-in user's own profile." },
+    ...(env.isProduction ? [] : [{ name: "Dev", description: "Development only. Not mounted in production." }]),
   ],
   components: {
     schemas: generateSchemaComponents(getSchemaRegistry()),

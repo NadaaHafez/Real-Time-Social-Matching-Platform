@@ -53,15 +53,18 @@ async function assertCanSignIn(user: {
  * Pi's server can check it, so everything below uses the identity Pi returns.
  */
 export async function signIn(authResult: PiAuthResult): Promise<SignInResponse> {
-  const verified = await piPlatform.verifyUser(authResult.accessToken);
+  return signInAs(await piPlatform.verifyUser(authResult.accessToken));
+}
 
+/** Everything after identity is known. Only call with an identity Pi (or dev mode) vouches for. */
+export async function signInAs(identity: { uid: string; username: string }): Promise<SignInResponse> {
   // Taken before the upsert, so "was this row just created" is exact rather than a guess.
   const startedAt = new Date();
 
   const user = await prisma.user.upsert({
-    where: { piUserId: verified.uid },
-    update: { username: verified.username },
-    create: { piUserId: verified.uid, username: verified.username },
+    where: { piUserId: identity.uid },
+    update: { username: identity.username },
+    create: { piUserId: identity.uid, username: identity.username },
     select: ACCOUNT_FIELDS,
   });
 

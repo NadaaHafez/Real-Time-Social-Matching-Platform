@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { globalLimiter } from "./middleware/rateLimit";
 import { requestLogger } from "./middleware/requestLogger";
 import routes from "./routes";
+import devRoutes from "./routes/dev/dev.routes";
 
 // Side-effect import: the `req.currentUser` augmentation.
 import "./types/express";
@@ -50,6 +51,11 @@ app.use(
 );
 
 app.get("/docs", (_req, res) => res.redirect("/api-docs"));
+
+// Never mounted in production. That absence is the only thing guarding these routes.
+if (!env.isProduction) {
+  app.use("/dev", devRoutes);
+}
 
 app.use(routes);
 
