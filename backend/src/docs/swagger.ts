@@ -2,6 +2,7 @@ import env from "../config/env";
 import { authRoutePaths } from "../routes/auth/auth.routes";
 import { devRoutePaths } from "../routes/dev/dev.routes";
 import { healthRoutePaths } from "../routes/health/health.routes";
+import { paymentsRoutePaths } from "../routes/payments/payments.routes";
 import { profileRoutePaths } from "../routes/profile/profile.routes";
 import { rollsRoutePaths } from "../routes/rolls/rolls.routes";
 import { getSchemaRegistry } from "./defineRoute";
@@ -47,6 +48,7 @@ const paths = {
   ...authRoutePaths,
   ...profileRoutePaths,
   ...rollsRoutePaths,
+  ...paymentsRoutePaths,
   // Documented only where app.ts mounts it.
   ...(env.isProduction ? {} : devRoutePaths),
 };
@@ -63,6 +65,7 @@ export const swaggerSpec = {
     { name: "Auth", description: "Pi sign-in, token refresh and sign-out." },
     { name: "Profile", description: "The signed-in user's own profile." },
     { name: "Rolls", description: "The in-app currency: balance, history, welcome grant and daily streak." },
+    { name: "Payments", description: "Buying Roll packs with Pi, through the Pi SDK's U2A payment flow." },
     ...(env.isProduction ? [] : [{ name: "Dev", description: "Development only. Not mounted in production." }]),
   ],
   components: {

@@ -4,6 +4,7 @@ import { prismaEnumSchemaComponents } from "./generated/prisma";
 import { authSchemaComponents } from "./schemas/auth.schema";
 import { commonSchemaComponents } from "./schemas/common.schema";
 import { profileSchemaComponents } from "./schemas/profile.schema";
+import { paymentsSchemaComponents } from "./schemas/payments.schema";
 import { rollsSchemaComponents } from "./schemas/rolls.schema";
 
 /**
@@ -16,4 +17,5 @@ export const allSchemaComponents: Record<string, ZodTypeAny> = {
   ...authSchemaComponents,
   ...profileSchemaComponents,
   ...rollsSchemaComponents,
+  ...paymentsSchemaComponents,
 };

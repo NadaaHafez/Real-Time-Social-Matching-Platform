@@ -69,6 +69,7 @@ model User {
   refreshTokens RefreshToken[]
   balance       Balance?
   ledgerEntries LedgerEntry[]
+  purchases     Purchase[]
 
   @@map("users")
 }
@@ -113,12 +114,14 @@ model Settings {
   @@map("settings")
 }
 
-/// What a ledger entry records. More types arrive with matchmaking, filters and payments.
+/// What a ledger entry records. More types arrive with matchmaking and filters.
 enum LedgerEntryType {
   /// The one-time grant after onboarding.
   welcome
   /// Free Rolls outside a purchase, like a daily streak claim.
   bonus
+  /// Rolls bought with Pi. `ref` is the Pi payment id.
+  purchase
 }
 
 /// A user's Rolls. Only ledger.service writes here, always with a ledger entry.
@@ -156,4 +159,53 @@ model LedgerEntry {
 
   @@index([userId, createdAt])
   @@map("ledger_entries")
+}
+
+/// A Roll bundle for sale. Never deleted once sold; set `active` to false instead.
+model RollPack {
+  /// Stable slug the client sends as `metadata.packId`, like `starter`.
+  id        String  @id
+  rolls     Int
+  /// Decimal, not Float: this is money. Pi has 7 decimal places.
+  priceInPi Decimal @map("price_in_pi") @db.Decimal(20, 7)
+  /// Label shown on the pack, like `popular`.
+  tag       String?
+  active    Boolean @default(true)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  purchases Purchase[]
+
+  @@map("roll_packs")
+}
+
+enum PurchaseStatus {
+  pending
+  completed
+  cancelled
+}
+
+/// One Pi payment for a pack. Recorded at approval, credited at completion.
+model Purchase {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  piPaymentId String  @unique @map("pi_payment_id")
+  /// On-chain transaction id. Null until completed.
+  txid        String? @unique
+
+  packId String   @map("pack_id")
+  pack   RollPack @relation(fields: [packId], references: [id], onDelete: Restrict)
+
+  /// Copied from the pack at approval, so a later price change never alters this purchase.
+  piAmount Decimal @map("pi_amount") @db.Decimal(20, 7)
+  rolls    Int
+
+  status PurchaseStatus @default(pending)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([userId, createdAt])
+  @@map("purchases")
 }

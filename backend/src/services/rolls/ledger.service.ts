@@ -52,14 +52,23 @@ export async function getBalance(userId: string): Promise<RollsBalance> {
   return balance ?? EMPTY;
 }
 
-/** Free Rolls into `available`. `applied` is false when the idempotency key was already used. */
-export async function grant(
-  type: Extract<LedgerEntryType, "welcome" | "bonus">,
+/** Joins the caller's transaction if there is one, otherwise opens its own. */
+function run<T>(tx: TransactionClient | undefined, fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
+  return tx ? fn(tx) : prisma.$transaction(fn);
+}
+
+/**
+ * Adds Rolls to `available`. `applied` is false when the idempotency key was already used.
+ * Pass `tx` to make the credit part of a larger write, like completing a purchase.
+ */
+export async function credit(
+  type: Extract<LedgerEntryType, "welcome" | "bonus" | "purchase">,
   { userId, amount, ref, idempotencyKey }: Movement,
+  tx?: TransactionClient,
 ): Promise<{ applied: boolean; balance: RollsBalance }> {
   assertPositive(amount);
 
-  return prisma.$transaction(async (tx) => {
+  return run(tx, async (tx) => {
     const balance = await lockBalance(tx, userId);
 
     if (await alreadyApplied(tx, idempotencyKey)) return { applied: false, balance };

@@ -9,5 +9,6 @@ export * from "./schemas/common.schema";
 export * from "./schemas/auth.schema";
 export * from "./schemas/profile.schema";
 export * from "./schemas/rolls.schema";
+export * from "./schemas/payments.schema";
 
 export * from "./registry";

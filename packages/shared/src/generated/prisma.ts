@@ -29,11 +29,15 @@ export type Gender = z.infer<typeof genderSchema>;
 export const Gender = genderSchema.enum;
 
 /**
- * What a ledger entry records. More types arrive with matchmaking, filters and payments.
+ * What a ledger entry records. More types arrive with matchmaking and filters.
  */
-export const ledgerEntryTypeSchema = z.enum(["welcome", "bonus"]).describe("What a ledger entry records. More types arrive with matchmaking, filters and payments.");
+export const ledgerEntryTypeSchema = z.enum(["welcome", "bonus", "purchase"]).describe("What a ledger entry records. More types arrive with matchmaking and filters.");
 export type LedgerEntryType = z.infer<typeof ledgerEntryTypeSchema>;
 export const LedgerEntryType = ledgerEntryTypeSchema.enum;
+
+export const purchaseStatusSchema = z.enum(["pending", "completed", "cancelled"]);
+export type PurchaseStatus = z.infer<typeof purchaseStatusSchema>;
+export const PurchaseStatus = purchaseStatusSchema.enum;
 
 // ============================================================================
 // MODELS (database shape: scalars only, Date objects)
@@ -169,6 +173,51 @@ export const ledgerEntryModelSchema = z.object({
 }).describe("Append-only record of every Roll movement. available + held always equals the sum of amount.");
 export type LedgerEntryModel = z.infer<typeof ledgerEntryModelSchema>;
 
+/**
+ * A Roll bundle for sale. Never deleted once sold; set `active` to false instead.
+ */
+export const rollPackModelSchema = z.object({
+  /**
+   * Stable slug the client sends as `metadata.packId`, like `starter`.
+   */
+  id: z.string().describe("Stable slug the client sends as `metadata.packId`, like `starter`."),
+  rolls: z.number().int(),
+  /**
+   * Decimal, not Float: this is money. Pi has 7 decimal places.
+   */
+  priceInPi: z.custom<{ toNumber(): number; toString(): string }>().describe("Decimal, not Float: this is money. Pi has 7 decimal places."),
+  /**
+   * Label shown on the pack, like `popular`.
+   */
+  tag: z.string().nullable().describe("Label shown on the pack, like `popular`."),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+}).describe("A Roll bundle for sale. Never deleted once sold; set `active` to false instead.");
+export type RollPackModel = z.infer<typeof rollPackModelSchema>;
+
+/**
+ * One Pi payment for a pack. Recorded at approval, credited at completion.
+ */
+export const purchaseModelSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  piPaymentId: z.string(),
+  /**
+   * On-chain transaction id. Null until completed.
+   */
+  txid: z.string().nullable().describe("On-chain transaction id. Null until completed."),
+  packId: z.string(),
+  /**
+   * Copied from the pack at approval, so a later price change never alters this purchase.
+   */
+  piAmount: z.custom<{ toNumber(): number; toString(): string }>().describe("Copied from the pack at approval, so a later price change never alters this purchase."),
+  rolls: z.number().int(),
+  status: purchaseStatusSchema,
+  createdAt: z.date(),
+  completedAt: z.date().nullable(),
+}).describe("One Pi payment for a pack. Recorded at approval, credited at completion.");
+export type PurchaseModel = z.infer<typeof purchaseModelSchema>;
+
 // ============================================================================
 // OPENAPI COMPONENTS
 // ============================================================================
@@ -179,4 +228,5 @@ export const prismaEnumSchemaComponents = {
   UserStatus: userStatusSchema,
   Gender: genderSchema,
   LedgerEntryType: ledgerEntryTypeSchema,
+  PurchaseStatus: purchaseStatusSchema,
 };

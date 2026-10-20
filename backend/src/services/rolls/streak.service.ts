@@ -70,7 +70,7 @@ export async function claimStreak(userId: string): Promise<ClaimStreakResponse> 
   const alreadyClaimed = () => HttpError.conflict("already_claimed_today", "You have already claimed today.");
   if (before.claimedToday) throw alreadyClaimed();
 
-  const { applied, balance } = await ledger.grant("bonus", {
+  const { applied, balance } = await ledger.credit("bonus", {
     userId,
     amount: before.bonusRolls,
     ref: `streak:day:${before.day}`,

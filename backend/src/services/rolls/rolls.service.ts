@@ -23,7 +23,7 @@ export async function claimWelcomeRolls(userId: string): Promise<RollsBalance> {
   if (welcomeRolls <= 0) return ledger.getBalance(userId);
 
   // The key, not a flag on the user, is what makes this once per account.
-  const { balance } = await ledger.grant("welcome", {
+  const { balance } = await ledger.credit("welcome", {
     userId,
     amount: welcomeRolls,
     ref: "onboarding",
