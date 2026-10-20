@@ -1,6 +1,7 @@
 import type { LedgerEntryType, RollsBalance } from "@social-matching/shared";
 
 import prisma, { TransactionClient } from "../../config/database";
+import { HttpError } from "../../utils/httpError";
 
 /**
  * The only code that moves Rolls. Every movement locks the balance row, then writes its
@@ -78,6 +79,38 @@ export async function credit(
     const updated = await tx.balance.update({
       where: { userId },
       data: { available: { increment: amount } },
+      select: { available: true, held: true },
+    });
+
+    return { applied: true, balance: updated };
+  });
+}
+
+/**
+ * Spends Rolls from `available` on something kept forever. The caller grants the item only
+ * when `applied` is true, so a repeated key can never grant it twice.
+ */
+export async function unlock(
+  { userId, amount, ref, idempotencyKey }: Movement,
+  tx?: TransactionClient,
+): Promise<{ applied: boolean; balance: RollsBalance }> {
+  assertPositive(amount);
+
+  return run(tx, async (tx) => {
+    const balance = await lockBalance(tx, userId);
+
+    if (await alreadyApplied(tx, idempotencyKey)) return { applied: false, balance };
+
+    // After the lock, so two parallel purchases cannot both pass this on the same Rolls.
+    if (balance.available < amount) {
+      throw HttpError.badRequest("insufficient_rolls", "You do not have enough Rolls for this.");
+    }
+
+    await tx.ledgerEntry.create({ data: { userId, type: "unlock", amount: -amount, ref, idempotencyKey } });
+
+    const updated = await tx.balance.update({
+      where: { userId },
+      data: { available: { decrement: amount } },
       select: { available: true, held: true },
     });
 

@@ -70,8 +70,47 @@ model User {
   balance       Balance?
   ledgerEntries LedgerEntry[]
   purchases     Purchase[]
+  matchFilter   MatchFilter?
 
   @@map("users")
+}
+
+/// Whether a country list means "only these" or "anyone but these".
+enum CountryMode {
+  include
+  exclude
+}
+
+/// Who a user wants to match with. Matching is mutual. Created on first use. Values are kept
+/// while a filter is off, so turning it back on restores them.
+model MatchFilter {
+  userId String @id @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ageEnabled Boolean @default(false) @map("age_enabled")
+  minAge     Int     @default(18) @map("min_age")
+  maxAge     Int     @default(99) @map("max_age")
+
+  /// On with no gender picked counts as off.
+  genderEnabled Boolean @default(false) @map("gender_enabled")
+  gender        Gender?
+
+  /// On with an empty active list counts as off.
+  countryEnabled   Boolean     @default(false) @map("country_enabled")
+  /// Which list applies. Both are kept.
+  countryMode      CountryMode @default(include) @map("country_mode")
+  /// ISO codes from the shared list. A CHECK in the migration keeps them two uppercase letters.
+  includeCountries String[]    @default([]) @map("include_countries")
+  excludeCountries String[]    @default([]) @map("exclude_countries")
+
+  /// Bought with Rolls and kept forever. A list may hold Settings' free slots plus these.
+  extraIncludeSlots Int @default(0) @map("extra_include_slots")
+  extraExcludeSlots Int @default(0) @map("extra_exclude_slots")
+
+  // The default lets the row be created with a raw INSERT.
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("match_filters")
 }
 
 /// One signed-in device. The token itself is never stored, only its SHA-256, so a leaked
@@ -109,12 +148,27 @@ model Settings {
   /// Rolls per streak day, day 1 first. Its length is the cycle; after the last day it restarts.
   streakRewards Int[] @default([1, 1, 1, 1, 1, 1, 3]) @map("streak_rewards")
 
+  /// A roll with every filter off.
+  baseRollCost      Int @default(1) @map("base_roll_cost")
+  /// Added to a roll while that filter is on.
+  ageFilterCost     Int @default(2) @map("age_filter_cost")
+  genderFilterCost  Int @default(3) @map("gender_filter_cost")
+  countryFilterCost Int @default(2) @map("country_filter_cost")
+
+  /// Country slots: free ones, the price of one more, and how many more can be bought.
+  freeIncludeSlots     Int @default(2) @map("free_include_slots")
+  freeExcludeSlots     Int @default(1) @map("free_exclude_slots")
+  includeSlotPrice     Int @default(8) @map("include_slot_price")
+  excludeSlotPrice     Int @default(8) @map("exclude_slot_price")
+  maxExtraIncludeSlots Int @default(3) @map("max_extra_include_slots")
+  maxExtraExcludeSlots Int @default(1) @map("max_extra_exclude_slots")
+
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
 }
 
-/// What a ledger entry records. More types arrive with matchmaking and filters.
+/// What a ledger entry records. More types arrive with matchmaking.
 enum LedgerEntryType {
   /// The one-time grant after onboarding.
   welcome
@@ -122,6 +176,8 @@ enum LedgerEntryType {
   bonus
   /// Rolls bought with Pi. `ref` is the Pi payment id.
   purchase
+  /// Rolls spent on something kept forever, like a country slot.
+  unlock
 }
 
 /// A user's Rolls. Only ledger.service writes here, always with a ledger entry.

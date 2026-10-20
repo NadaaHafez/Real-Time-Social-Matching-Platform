@@ -10,5 +10,6 @@ export * from "./schemas/auth.schema";
 export * from "./schemas/profile.schema";
 export * from "./schemas/rolls.schema";
 export * from "./schemas/payments.schema";
+export * from "./schemas/filters.schema";
 
 export * from "./registry";

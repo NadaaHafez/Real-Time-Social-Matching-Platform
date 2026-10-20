@@ -29,9 +29,16 @@ export type Gender = z.infer<typeof genderSchema>;
 export const Gender = genderSchema.enum;
 
 /**
- * What a ledger entry records. More types arrive with matchmaking and filters.
+ * Whether a country list means "only these" or "anyone but these".
  */
-export const ledgerEntryTypeSchema = z.enum(["welcome", "bonus", "purchase"]).describe("What a ledger entry records. More types arrive with matchmaking and filters.");
+export const countryModeSchema = z.enum(["include", "exclude"]).describe("Whether a country list means \"only these\" or \"anyone but these\".");
+export type CountryMode = z.infer<typeof countryModeSchema>;
+export const CountryMode = countryModeSchema.enum;
+
+/**
+ * What a ledger entry records. More types arrive with matchmaking.
+ */
+export const ledgerEntryTypeSchema = z.enum(["welcome", "bonus", "purchase", "unlock"]).describe("What a ledger entry records. More types arrive with matchmaking.");
 export type LedgerEntryType = z.infer<typeof ledgerEntryTypeSchema>;
 export const LedgerEntryType = ledgerEntryTypeSchema.enum;
 
@@ -90,6 +97,42 @@ export const userModelSchema = z.object({
 export type UserModel = z.infer<typeof userModelSchema>;
 
 /**
+ * Who a user wants to match with. Matching is mutual. Created on first use. Values are kept
+ * while a filter is off, so turning it back on restores them.
+ */
+export const matchFilterModelSchema = z.object({
+  userId: z.string(),
+  ageEnabled: z.boolean(),
+  minAge: z.number().int(),
+  maxAge: z.number().int(),
+  /**
+   * On with no gender picked counts as off.
+   */
+  genderEnabled: z.boolean().describe("On with no gender picked counts as off."),
+  gender: genderSchema.nullable(),
+  /**
+   * On with an empty active list counts as off.
+   */
+  countryEnabled: z.boolean().describe("On with an empty active list counts as off."),
+  /**
+   * Which list applies. Both are kept.
+   */
+  countryMode: countryModeSchema.describe("Which list applies. Both are kept."),
+  /**
+   * ISO codes from the shared list. A CHECK in the migration keeps them two uppercase letters.
+   */
+  includeCountries: z.array(z.string()).describe("ISO codes from the shared list. A CHECK in the migration keeps them two uppercase letters."),
+  excludeCountries: z.array(z.string()),
+  /**
+   * Bought with Rolls and kept forever. A list may hold Settings' free slots plus these.
+   */
+  extraIncludeSlots: z.number().int().describe("Bought with Rolls and kept forever. A list may hold Settings' free slots plus these."),
+  extraExcludeSlots: z.number().int(),
+  updatedAt: z.date(),
+}).describe("Who a user wants to match with. Matching is mutual. Created on first use. Values are kept\nwhile a filter is off, so turning it back on restores them.");
+export type MatchFilterModel = z.infer<typeof matchFilterModelSchema>;
+
+/**
  * One signed-in device. The token itself is never stored, only its SHA-256, so a leaked
  * database cannot be replayed as sessions.
  */
@@ -129,6 +172,25 @@ export const settingsModelSchema = z.object({
    * Rolls per streak day, day 1 first. Its length is the cycle; after the last day it restarts.
    */
   streakRewards: z.array(z.number().int()).describe("Rolls per streak day, day 1 first. Its length is the cycle; after the last day it restarts."),
+  /**
+   * A roll with every filter off.
+   */
+  baseRollCost: z.number().int().describe("A roll with every filter off."),
+  /**
+   * Added to a roll while that filter is on.
+   */
+  ageFilterCost: z.number().int().describe("Added to a roll while that filter is on."),
+  genderFilterCost: z.number().int(),
+  countryFilterCost: z.number().int(),
+  /**
+   * Country slots: free ones, the price of one more, and how many more can be bought.
+   */
+  freeIncludeSlots: z.number().int().describe("Country slots: free ones, the price of one more, and how many more can be bought."),
+  freeExcludeSlots: z.number().int(),
+  includeSlotPrice: z.number().int(),
+  excludeSlotPrice: z.number().int(),
+  maxExtraIncludeSlots: z.number().int(),
+  maxExtraExcludeSlots: z.number().int(),
   updatedAt: z.date(),
 }).describe("App-wide policy an admin can change without a deploy. Exactly one row, id 1, created\nwith these defaults the first time it is read.");
 export type SettingsModel = z.infer<typeof settingsModelSchema>;
@@ -227,6 +289,7 @@ export const prismaEnumSchemaComponents = {
   UserRole: userRoleSchema,
   UserStatus: userStatusSchema,
   Gender: genderSchema,
+  CountryMode: countryModeSchema,
   LedgerEntryType: ledgerEntryTypeSchema,
   PurchaseStatus: purchaseStatusSchema,
 };
