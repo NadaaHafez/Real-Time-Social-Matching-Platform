@@ -89,7 +89,8 @@ export function handleEvent<T>(schema: ZodType<T, ZodTypeDef, unknown>, handler:
     const parsed = schema.safeParse(payload);
     if (!parsed.success) {
       const issue = parsed.error.errors[0];
-      reply({ ok: false, error: "validation_failed", message: `${issue.path.join(".")}: ${issue.message}` });
+      const message = issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message;
+      reply({ ok: false, error: "validation_failed", message });
       return;
     }
 

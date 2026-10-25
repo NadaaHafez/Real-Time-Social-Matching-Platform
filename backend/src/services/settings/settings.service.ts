@@ -1,4 +1,8 @@
+import type { AppSettings, UpdateSettingsRequest } from "@social-matching/shared";
+
 import prisma from "../../config/database";
+import logger from "../../config/logger";
+import type { CurrentUser } from "../../types/express";
 
 const SETTINGS_ID = 1;
 
@@ -36,4 +40,25 @@ export function getSettings(): Promise<Settings> {
 /** Call after saving Settings, so the next read sees the change. */
 export function invalidateSettings(): void {
   cached = null;
+}
+
+/** The row minus its bookkeeping columns: what an owner sees and edits. */
+export function toAppSettings(settings: Settings): AppSettings {
+  const { id: _id, updatedAt: _updatedAt, ...editable } = settings;
+  return editable;
+}
+
+export async function updateSettings(patch: UpdateSettingsRequest, owner: CurrentUser): Promise<AppSettings> {
+  const saved = await prisma.settings.upsert({
+    where: { id: SETTINGS_ID },
+    update: patch,
+    create: { id: SETTINGS_ID, ...patch },
+  });
+
+  invalidateSettings();
+
+  // Rare and far-reaching: this is the line that explains why prices changed one day.
+  logger.info("Settings changed", { by: owner.username, changes: patch, category: "admin" });
+
+  return toAppSettings(saved);
 }

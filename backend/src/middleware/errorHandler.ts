@@ -30,7 +30,8 @@ export function errorHandler(err: unknown, req: Request, res: Response<ApiError>
 
   if (err instanceof ZodError) {
     const first = err.errors[0];
-    const detail = first ? `${first.path.join(".")}: ${first.message}` : "Invalid request.";
+    // A whole-object rule (like "at least one field") has no path to prefix.
+    const detail = !first ? "Invalid request." : first.path.length ? `${first.path.join(".")}: ${first.message}` : first.message;
 
     logger.warn("Validation failed", { ...context(req), status: 400, detail });
     res.status(400).json({ error: "validation_failed", message: detail });

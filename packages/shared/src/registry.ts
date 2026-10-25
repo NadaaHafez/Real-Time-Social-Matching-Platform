@@ -1,6 +1,7 @@
 import type { ZodTypeAny } from "zod";
 
 import { prismaEnumSchemaComponents } from "./generated/prisma";
+import { adminSchemaComponents } from "./schemas/admin.schema";
 import { authSchemaComponents } from "./schemas/auth.schema";
 import { chatSchemaComponents } from "./schemas/chat.schema";
 import { commonSchemaComponents } from "./schemas/common.schema";
@@ -26,4 +27,5 @@ export const allSchemaComponents: Record<string, ZodTypeAny> = {
   ...matchmakingSchemaComponents,
   ...chatSchemaComponents,
   ...moderationSchemaComponents,
+  ...adminSchemaComponents,
 };

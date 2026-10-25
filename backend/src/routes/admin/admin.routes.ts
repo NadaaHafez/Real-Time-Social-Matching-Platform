@@ -2,15 +2,20 @@ import { Router } from "express";
 
 import {
   adminMeSchema,
+  adminPackSchema,
+  appSettingsSchema,
+  packIdParamsSchema,
   reportDetailSchema,
   reportIdParamsSchema,
   reportListQuerySchema,
   reportsPageSchema,
   resolveReportRequestSchema,
+  savePackRequestSchema,
+  updateSettingsRequestSchema,
 } from "@social-matching/shared";
 
 import * as adminController from "../../controllers/admin/admin.controller";
-import { buildRouteSpec, errorResponse } from "../../docs/defineRoute";
+import { arrayOf, buildRouteSpec, errorResponse } from "../../docs/defineRoute";
 import { requireRole, requireUser } from "../../middleware/auth";
 import { validateBody, validateParams, validateQuery } from "../../middleware/validation";
 
@@ -67,11 +72,57 @@ const resolveReportSpec = buildRouteSpec({
   },
 });
 
+const OWNER_ONLY = errorResponse("Owners only — `insufficient_role`.");
+
+const getSettingsSpec = buildRouteSpec({
+  summary: "Read the app settings",
+  description: "Owners only.",
+  tags: TAGS,
+  successResponse: { status: 200, description: "Every setting.", dataRef: appSettingsSchema },
+  extraResponses: { 403: OWNER_ONLY },
+});
+
+const updateSettingsSpec = buildRouteSpec({
+  summary: "Change app settings",
+  description:
+    "Owners only. Send only what changes. Applies from the next request: prices to the next roll, " +
+    "the timeout to the next search. Bought slots are never taken away by lowering a limit.",
+  tags: TAGS,
+  body: updateSettingsRequestSchema,
+  successResponse: { status: 200, description: "The settings after the change.", dataRef: appSettingsSchema },
+  errors: [...ADMIN_ERRORS],
+  extraResponses: { 403: OWNER_ONLY },
+});
+
+const listPacksSpec = buildRouteSpec({
+  summary: "Every Roll pack, hidden ones included",
+  description: "Owners only.",
+  tags: TAGS,
+  successResponse: { status: 200, description: "All packs.", dataSchema: arrayOf(adminPackSchema) },
+  extraResponses: { 403: OWNER_ONLY },
+});
+
+const savePackSpec = buildRouteSpec({
+  summary: "Create or edit a Roll pack",
+  description:
+    "Owners only. Packs are never deleted, because purchases point at them: set `active: false` to " +
+    "hide one. A new price applies to new payments only.",
+  tags: TAGS,
+  params: packIdParamsSchema,
+  body: savePackRequestSchema,
+  successResponse: { status: 200, description: "The saved pack.", dataRef: adminPackSchema },
+  errors: [...ADMIN_ERRORS],
+  extraResponses: { 403: OWNER_ONLY },
+});
+
 export const adminRoutePaths = {
   "/admin/me": { get: getMeSpec },
   "/admin/reports": { get: listReportsSpec },
   "/admin/reports/{reportId}": { get: getReportSpec },
   "/admin/reports/{reportId}/resolve": { post: resolveReportSpec },
+  "/admin/settings": { get: getSettingsSpec, patch: updateSettingsSpec },
+  "/admin/packs": { get: listPacksSpec },
+  "/admin/packs/{packId}": { put: savePackSpec },
 };
 
 // ============================================================================
@@ -88,6 +139,20 @@ router.post(
   validateParams(reportIdParamsSchema),
   validateBody(resolveReportRequestSchema),
   adminController.resolveReport,
+);
+
+// Owner only, on top of the moderator check above.
+const owner = requireRole("owner");
+
+router.get("/settings", owner, adminController.getSettings);
+router.patch("/settings", owner, validateBody(updateSettingsRequestSchema), adminController.updateSettings);
+router.get("/packs", owner, adminController.listPacks);
+router.put(
+  "/packs/:packId",
+  owner,
+  validateParams(packIdParamsSchema),
+  validateBody(savePackRequestSchema),
+  adminController.savePack,
 );
 
 export default router;

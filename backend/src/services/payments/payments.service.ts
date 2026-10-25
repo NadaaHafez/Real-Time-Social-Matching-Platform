@@ -1,4 +1,4 @@
-import type { PaymentReceipt, RollPack, RollsBalance } from "@social-matching/shared";
+import type { AdminPack, PaymentReceipt, RollPack, RollsBalance, SavePackRequest } from "@social-matching/shared";
 
 import { Prisma } from "../../../generated/prisma/client";
 import prisma from "../../config/database";
@@ -40,6 +40,35 @@ export async function listPacks(): Promise<RollPack[]> {
   });
 
   return packs.map((pack) => ({ ...pack, priceInPi: pack.priceInPi.toNumber() }));
+}
+
+// ============================================================================
+// ADMIN: PACKS
+// ============================================================================
+
+const ADMIN_PACK_FIELDS = { id: true, rolls: true, priceInPi: true, tag: true, active: true, sortOrder: true } as const;
+
+/** Every pack, hidden ones included. */
+export async function listAllPacks(): Promise<AdminPack[]> {
+  const packs = await prisma.rollPack.findMany({ orderBy: { sortOrder: "asc" }, select: ADMIN_PACK_FIELDS });
+  return packs.map((pack) => ({ ...pack, priceInPi: pack.priceInPi.toNumber() }));
+}
+
+/**
+ * Creates or replaces a pack. A price change only affects new payments: each purchase copied
+ * the price it was approved at.
+ */
+export async function savePack(packId: string, input: SavePackRequest, owner: CurrentUser): Promise<AdminPack> {
+  const pack = await prisma.rollPack.upsert({
+    where: { id: packId },
+    update: input,
+    create: { id: packId, ...input },
+    select: ADMIN_PACK_FIELDS,
+  });
+
+  logger.info("Roll pack saved", { by: owner.username, packId, ...input, category: "admin" });
+
+  return { ...pack, priceInPi: pack.priceInPi.toNumber() };
 }
 
 export async function approve(user: CurrentUser, paymentId: string): Promise<void> {
