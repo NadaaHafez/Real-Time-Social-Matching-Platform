@@ -5,8 +5,9 @@ import prisma from "./config/database";
 import env from "./config/env";
 import logger from "./config/logger";
 import { attachSocketServer, closeSocketServer } from "./realtime/socket";
-import { registerMatchmakingHandlers, startMatchmaker, stopMatchmaker } from "./services/matchmaking/matchmaking.service";
-import { loadOpenSessions, registerSessionHandlers } from "./services/sessions/session.service";
+import { startMatchmaker, stopMatchmaker } from "./services/matchmaking/matchmaking.service";
+import { loadOpenSessions } from "./services/sessions/session.service";
+import { registerSocketHandlers } from "./sockets";
 
 /** How long in-flight requests get to finish before the process exits anyway. */
 const SHUTDOWN_GRACE_MS = 10_000;
@@ -49,9 +50,7 @@ async function start() {
 
     // An explicit http.Server rather than app.listen, so Socket.IO can share the port.
     const server = createServer(app);
-    const io = attachSocketServer(server);
-    registerSessionHandlers(io);
-    registerMatchmakingHandlers(io);
+    attachSocketServer(server, registerSocketHandlers);
 
     // Emitted, not thrown, so the try/catch never sees an occupied port.
     server.on("error", (err) => {

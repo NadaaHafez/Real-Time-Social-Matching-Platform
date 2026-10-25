@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import authRoutes from "./auth/auth.routes";
+import chatRoutes from "./chat/chat.routes";
 import filtersRoutes from "./filters/filters.routes";
 import healthRoutes from "./health/health.routes";
 import matchmakingRoutes from "./matchmaking/matchmaking.routes";
@@ -18,5 +19,6 @@ router.use("/me", profileRoutes);
 router.use("/rolls", rollsRoutes);
 router.use("/payments", paymentsRoutes);
 router.use("/matchmaking", matchmakingRoutes);
+router.use("/chat", chatRoutes);
 
 export default router;

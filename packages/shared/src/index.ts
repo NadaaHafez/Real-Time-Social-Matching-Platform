@@ -12,5 +12,7 @@ export * from "./schemas/rolls.schema";
 export * from "./schemas/payments.schema";
 export * from "./schemas/filters.schema";
 export * from "./schemas/matchmaking.schema";
+export * from "./schemas/chat.schema";
+export * from "./schemas/socket.schema";
 
 export * from "./registry";

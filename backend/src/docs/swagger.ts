@@ -1,5 +1,6 @@
 import env from "../config/env";
 import { authRoutePaths } from "../routes/auth/auth.routes";
+import { chatRoutePaths } from "../routes/chat/chat.routes";
 import { devRoutePaths } from "../routes/dev/dev.routes";
 import { healthRoutePaths } from "../routes/health/health.routes";
 import { filtersRoutePaths } from "../routes/filters/filters.routes";
@@ -53,6 +54,7 @@ const paths = {
   ...rollsRoutePaths,
   ...paymentsRoutePaths,
   ...matchmakingRoutePaths,
+  ...chatRoutePaths,
   // Documented only where app.ts mounts it.
   ...(env.isProduction ? {} : devRoutePaths),
 };
@@ -72,6 +74,7 @@ export const swaggerSpec = {
     { name: "Rolls", description: "The in-app currency: balance, history, welcome grant and daily streak." },
     { name: "Payments", description: "Buying Roll packs with Pi, through the Pi SDK's U2A payment flow." },
     { name: "Matchmaking", description: "Searching for a partner. Outcomes arrive over Socket.IO." },
+    { name: "Chat", description: "1-on-1 chat. Messages travel over Socket.IO and are never stored." },
     ...(env.isProduction ? [] : [{ name: "Dev", description: "Development only. Not mounted in production." }]),
   ],
   components: {

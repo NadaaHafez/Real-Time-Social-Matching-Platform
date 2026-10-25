@@ -2,12 +2,12 @@ import type { CancelRollResponse, CountryCode, QueueStats, RollResponse, RollsBa
 
 import prisma from "../../config/database";
 import logger from "../../config/logger";
-import { emitToUser, IoServer, isOnline } from "../../realtime/socket";
+import { emitToUser, isOnline } from "../../realtime/socket";
 import type { CurrentUser } from "../../types/express";
 import { HttpError } from "../../utils/httpError";
 import { lockSnapshot, rollCostOf } from "../filters/filters.service";
 import * as ledger from "../rolls/ledger.service";
-import { createSession, markOpen, openSessionOf } from "../sessions/session.service";
+import { createSession, markOpen, openSessionOf, partnerSummary } from "../sessions/session.service";
 import { getSettings } from "../settings/settings.service";
 import { pairWaiting, WaitingTicket } from "./pairing";
 
@@ -197,8 +197,15 @@ async function runPass(): Promise<void> {
     forget(a);
     forget(b);
 
-    emitToUser(a.userId, "match:found", { ticketId: a.id, sessionId: session.id, partner: { username: b.username, country: b.profile.country } });
-    emitToUser(b.userId, "match:found", { ticketId: b.id, sessionId: session.id, partner: { username: a.username, country: a.profile.country } });
+    // Each side is told about the other.
+    for (const [me, partner] of [[a, b], [b, a]]) {
+      emitToUser(me.userId, "match:found", {
+        ticketId: me.id,
+        sessionId: session.id,
+        partner: partnerSummary({ username: partner.username, ...partner.profile }),
+      });
+    }
+
     logger.info("Matched", { sessionId: session.id, users: [a.userId, b.userId] });
   }
 }
@@ -234,20 +241,17 @@ export function queueStats(): QueueStats {
   return { waiting: waiting.size };
 }
 
-export function registerMatchmakingHandlers(io: IoServer): void {
-  io.on("connection", (socket) => {
-    const { id: userId } = socket.data.user;
+/**
+ * The user's last socket closed. Their search is cancelled and refunded unless they reconnect
+ * within the grace period: nobody would be there to receive a match.
+ */
+export function userWentOffline(userId: string): void {
+  setTimeout(() => {
+    const ticketId = ticketByUser.get(userId);
+    if (isOnline(userId) || !ticketId || ticketId === PENDING) return;
 
-    socket.on("disconnect", () => {
-      if (isOnline(userId)) return;
-
-      setTimeout(() => {
-        const ticketId = ticketByUser.get(userId);
-        if (isOnline(userId) || !ticketId || ticketId === PENDING) return;
-        void endTicket({ id: ticketId, userId }, "cancelled").catch((err) =>
-          logger.error("Disconnect cancel failed", { err: err instanceof Error ? err.message : String(err) }),
-        );
-      }, DISCONNECT_GRACE_MS).unref();
-    });
-  });
+    endTicket({ id: ticketId, userId }, "cancelled").catch((err) =>
+      logger.error("Disconnect cancel failed", { err: err instanceof Error ? err.message : String(err) }),
+    );
+  }, DISCONNECT_GRACE_MS).unref();
 }

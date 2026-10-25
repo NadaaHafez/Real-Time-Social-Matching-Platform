@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { countryCodeSchema } from "./common.schema";
+import { partnerSummarySchema } from "./chat.schema";
 import { rollsBalanceSchema } from "./rolls.schema";
 
 // ============================================================================
@@ -35,7 +35,7 @@ export type QueueStats = z.infer<typeof queueStatsSchema>;
 export const matchFoundEventSchema = z.object({
   ticketId: z.string(),
   sessionId: z.string().describe("The chat both users are now in."),
-  partner: z.object({ username: z.string(), country: countryCodeSchema }),
+  partner: partnerSummarySchema,
 });
 export type MatchFoundEvent = z.infer<typeof matchFoundEventSchema>;
 
@@ -59,20 +59,6 @@ export type SessionEndedEvent = z.infer<typeof sessionEndedEventSchema>;
 
 export const sessionLeaveEventSchema = z.object({ sessionId: z.string().min(1) });
 export type SessionLeaveEvent = z.infer<typeof sessionLeaveEventSchema>;
-
-/** Every socket.emit callback gets one of these. */
-export type SocketAck = { ok: true } | { ok: false; error: string; message: string };
-
-/** Socket.IO's typed-events maps: `new Server<ClientToServerEvents, ServerToClientEvents>()`. */
-export interface ServerToClientEvents {
-  "match:found": (event: MatchFoundEvent) => void;
-  "match:ended": (event: MatchEndedEvent) => void;
-  "session:ended": (event: SessionEndedEvent) => void;
-}
-
-export interface ClientToServerEvents {
-  "session:leave": (event: SessionLeaveEvent, ack: (result: SocketAck) => void) => void;
-}
 
 // ============================================================================
 // OPENAPI COMPONENTS
