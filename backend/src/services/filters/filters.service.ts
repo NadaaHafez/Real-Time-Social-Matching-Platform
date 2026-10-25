@@ -117,6 +117,11 @@ export async function lockFilters(tx: TransactionClient, userId: string): Promis
   return tx.matchFilter.findUniqueOrThrow({ where: { userId }, select: FILTER_FIELDS });
 }
 
+/** What a roll applies, read under the filter lock so a save cannot land mid-roll. */
+export async function lockSnapshot(tx: TransactionClient, userId: string): Promise<FilterSnapshot> {
+  return snapshotOf(toFilters(await lockFilters(tx, userId)));
+}
+
 export async function getFilterState(userId: string): Promise<FilterState> {
   const row = await prisma.matchFilter.upsert({
     where: { userId },

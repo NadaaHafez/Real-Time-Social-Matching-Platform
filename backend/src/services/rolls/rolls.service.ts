@@ -35,11 +35,12 @@ export async function claimWelcomeRolls(userId: string): Promise<RollsBalance> {
 
 /**
  * Wallet history, newest first. Cursor-paged: an offset would shift when new entries land
- * on top. `id` breaks ties between entries with the same `createdAt`.
+ * on top. `id` breaks ties between entries with the same `createdAt`. `hold` and `refund`
+ * are left out: they carry 0 and would show as two empty rows per roll.
  */
 export async function getHistory(userId: string, { cursor, limit = DEFAULT_PAGE_SIZE }: LedgerQuery): Promise<LedgerPage> {
   const rows = await prisma.ledgerEntry.findMany({
-    where: { userId },
+    where: { userId, type: { notIn: ["hold", "refund"] } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     // One extra row tells us whether another page exists, without a count query.
     take: limit + 1,

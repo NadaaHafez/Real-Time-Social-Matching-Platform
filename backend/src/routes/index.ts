@@ -3,6 +3,7 @@ import { Router } from "express";
 import authRoutes from "./auth/auth.routes";
 import filtersRoutes from "./filters/filters.routes";
 import healthRoutes from "./health/health.routes";
+import matchmakingRoutes from "./matchmaking/matchmaking.routes";
 import paymentsRoutes from "./payments/payments.routes";
 import profileRoutes from "./profile/profile.routes";
 import rollsRoutes from "./rolls/rolls.routes";
@@ -16,5 +17,6 @@ router.use("/me/filters", filtersRoutes);
 router.use("/me", profileRoutes);
 router.use("/rolls", rollsRoutes);
 router.use("/payments", paymentsRoutes);
+router.use("/matchmaking", matchmakingRoutes);
 
 export default router;

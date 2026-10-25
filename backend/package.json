@@ -11,18 +11,20 @@
     "prisma:generate": "prisma generate && ts-node --transpile-only scripts/generate-shared-schemas.ts",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "docs:emit": "ts-node --transpile-only scripts/emit-docs.ts"
+    "docs:emit": "ts-node --transpile-only scripts/emit-docs.ts",
+    "demo:match": "ts-node --transpile-only scripts/demo-match.ts"
   },
   "dependencies": {
-    "@social-matching/shared": "0.1.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "@social-matching/shared": "0.1.0",
     "axios": "^1.7.9",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
     "zod": "^3.25.0"
   },
@@ -34,6 +36,7 @@
     "@types/node": "^22.10.7",
     "@types/swagger-ui-express": "^4.1.8",
     "prisma": "^7.9.1",
+    "socket.io-client": "^4.8.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.3"

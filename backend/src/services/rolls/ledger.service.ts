@@ -7,6 +7,15 @@ import { HttpError } from "../../utils/httpError";
  * The only code that moves Rolls. Every movement locks the balance row, then writes its
  * ledger entry and the balance change in one transaction, so `available + held` always
  * equals the sum of the user's entries.
+ *
+ *   type     | entry | available | held
+ *   welcome  |  +N   |    +N     |  -
+ *   bonus    |  +N   |    +N     |  -
+ *   purchase |  +N   |    +N     |  -
+ *   unlock   |  -N   |    -N     |  -
+ *   hold     |   0   |    -N     | +N
+ *   spend    |  -N   |     -     | -N
+ *   refund   |   0   |    +N     | -N
  */
 
 interface Movement {
@@ -17,6 +26,8 @@ interface Movement {
   /** A repeat with the same key changes nothing. */
   idempotencyKey?: string;
 }
+
+type Result = { applied: boolean; balance: RollsBalance };
 
 const EMPTY: RollsBalance = { available: 0, held: 0 };
 
@@ -42,78 +53,103 @@ async function alreadyApplied(tx: TransactionClient, idempotencyKey?: string): P
   return existing !== null;
 }
 
-function assertPositive(amount: number) {
+/** Joins the caller's transaction if there is one, otherwise opens its own. */
+function run<T>(tx: TransactionClient | undefined, fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
+  return tx ? fn(tx) : prisma.$transaction(fn);
+}
+
+/** One row of the table above, for an amount of N. */
+interface Effect {
+  type: LedgerEntryType;
+  entry: number;
+  available: number;
+  held: number;
+  /** Throws if the balance cannot cover it. Runs after the lock. */
+  check?: (balance: RollsBalance) => void;
+}
+
+function move({ userId, amount, ref, idempotencyKey }: Movement, effect: Effect, tx?: TransactionClient) {
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new Error(`Roll amounts must be positive integers, got ${amount}`);
   }
+
+  return run(tx, async (tx): Promise<Result> => {
+    const balance = await lockBalance(tx, userId);
+
+    if (await alreadyApplied(tx, idempotencyKey)) return { applied: false, balance };
+
+    effect.check?.(balance);
+
+    await tx.ledgerEntry.create({ data: { userId, type: effect.type, amount: effect.entry, ref, idempotencyKey } });
+
+    const updated = await tx.balance.update({
+      where: { userId },
+      data: { available: { increment: effect.available }, held: { increment: effect.held } },
+      select: { available: true, held: true },
+    });
+
+    return { applied: true, balance: updated };
+  });
 }
+
+const needsAvailable = (amount: number, message: string) => (balance: RollsBalance) => {
+  if (balance.available < amount) throw HttpError.badRequest("insufficient_rolls", message);
+};
+
+// Held Rolls missing means a settle ran twice or out of order: a bug, never the user's doing.
+const needsHeld = (amount: number) => (balance: RollsBalance) => {
+  if (balance.held < amount) throw new Error(`Only ${balance.held} Rolls held, cannot settle ${amount}`);
+};
+
+// ============================================================================
+// PUBLIC
+// ============================================================================
 
 export async function getBalance(userId: string): Promise<RollsBalance> {
   const balance = await prisma.balance.findUnique({ where: { userId }, select: { available: true, held: true } });
   return balance ?? EMPTY;
 }
 
-/** Joins the caller's transaction if there is one, otherwise opens its own. */
-function run<T>(tx: TransactionClient | undefined, fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
-  return tx ? fn(tx) : prisma.$transaction(fn);
-}
-
 /**
  * Adds Rolls to `available`. `applied` is false when the idempotency key was already used.
  * Pass `tx` to make the credit part of a larger write, like completing a purchase.
  */
-export async function credit(
+export function credit(
   type: Extract<LedgerEntryType, "welcome" | "bonus" | "purchase">,
-  { userId, amount, ref, idempotencyKey }: Movement,
+  movement: Movement,
   tx?: TransactionClient,
-): Promise<{ applied: boolean; balance: RollsBalance }> {
-  assertPositive(amount);
-
-  return run(tx, async (tx) => {
-    const balance = await lockBalance(tx, userId);
-
-    if (await alreadyApplied(tx, idempotencyKey)) return { applied: false, balance };
-
-    await tx.ledgerEntry.create({ data: { userId, type, amount, ref, idempotencyKey } });
-
-    const updated = await tx.balance.update({
-      where: { userId },
-      data: { available: { increment: amount } },
-      select: { available: true, held: true },
-    });
-
-    return { applied: true, balance: updated };
-  });
+): Promise<Result> {
+  return move(movement, { type, entry: movement.amount, available: movement.amount, held: 0 }, tx);
 }
 
-/**
- * Spends Rolls from `available` on something kept forever. The caller grants the item only
- * when `applied` is true, so a repeated key can never grant it twice.
- */
-export async function unlock(
-  { userId, amount, ref, idempotencyKey }: Movement,
-  tx?: TransactionClient,
-): Promise<{ applied: boolean; balance: RollsBalance }> {
-  assertPositive(amount);
+/** Spends Rolls on something kept forever. Grant the item only when `applied` is true. */
+export function unlock(movement: Movement, tx?: TransactionClient): Promise<Result> {
+  const { amount } = movement;
+  return move(
+    movement,
+    { type: "unlock", entry: -amount, available: -amount, held: 0, check: needsAvailable(amount, "You do not have enough Rolls for this.") },
+    tx,
+  );
+}
 
-  return run(tx, async (tx) => {
-    const balance = await lockBalance(tx, userId);
+/** Reserves Rolls for a roll while it searches, so they cannot be spent twice. */
+export function hold(movement: Movement, tx?: TransactionClient): Promise<Result> {
+  const { amount } = movement;
+  return move(
+    movement,
+    { type: "hold", entry: 0, available: -amount, held: amount, check: needsAvailable(amount, "You do not have enough Rolls to roll.") },
+    tx,
+  );
+}
 
-    if (await alreadyApplied(tx, idempotencyKey)) return { applied: false, balance };
+/** A held roll is used up by a match. */
+export function spend(movement: Movement, tx?: TransactionClient): Promise<Result> {
+  const { amount } = movement;
+  return move(movement, { type: "spend", entry: -amount, available: 0, held: -amount, check: needsHeld(amount) }, tx);
+}
 
-    // After the lock, so two parallel purchases cannot both pass this on the same Rolls.
-    if (balance.available < amount) {
-      throw HttpError.badRequest("insufficient_rolls", "You do not have enough Rolls for this.");
-    }
-
-    await tx.ledgerEntry.create({ data: { userId, type: "unlock", amount: -amount, ref, idempotencyKey } });
-
-    const updated = await tx.balance.update({
-      where: { userId },
-      data: { available: { decrement: amount } },
-      select: { available: true, held: true },
-    });
-
-    return { applied: true, balance: updated };
-  });
+/** A held roll is returned: nobody was found, or the roll was cancelled. */
+export function refund(movement: Movement, tx?: TransactionClient): Promise<Result> {
+  const { amount } = movement;
+  return move(movement, { type: "refund", entry: 0, available: amount, held: -amount, check: needsHeld(amount) }, tx);
 }

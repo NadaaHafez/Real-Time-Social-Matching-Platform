@@ -3,6 +3,7 @@ import { authRoutePaths } from "../routes/auth/auth.routes";
 import { devRoutePaths } from "../routes/dev/dev.routes";
 import { healthRoutePaths } from "../routes/health/health.routes";
 import { filtersRoutePaths } from "../routes/filters/filters.routes";
+import { matchmakingRoutePaths } from "../routes/matchmaking/matchmaking.routes";
 import { paymentsRoutePaths } from "../routes/payments/payments.routes";
 import { profileRoutePaths } from "../routes/profile/profile.routes";
 import { rollsRoutePaths } from "../routes/rolls/rolls.routes";
@@ -51,6 +52,7 @@ const paths = {
   ...filtersRoutePaths,
   ...rollsRoutePaths,
   ...paymentsRoutePaths,
+  ...matchmakingRoutePaths,
   // Documented only where app.ts mounts it.
   ...(env.isProduction ? {} : devRoutePaths),
 };
@@ -69,6 +71,7 @@ export const swaggerSpec = {
     { name: "Filters", description: "Who a user wants to match with, and the country slots they own." },
     { name: "Rolls", description: "The in-app currency: balance, history, welcome grant and daily streak." },
     { name: "Payments", description: "Buying Roll packs with Pi, through the Pi SDK's U2A payment flow." },
+    { name: "Matchmaking", description: "Searching for a partner. Outcomes arrive over Socket.IO." },
     ...(env.isProduction ? [] : [{ name: "Dev", description: "Development only. Not mounted in production." }]),
   ],
   components: {

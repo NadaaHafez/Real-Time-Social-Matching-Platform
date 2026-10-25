@@ -1,15 +1,18 @@
-import { createServer, Server } from "http";
+import { createServer } from "http";
 
 import app from "./app";
 import prisma from "./config/database";
 import env from "./config/env";
 import logger from "./config/logger";
+import { attachSocketServer, closeSocketServer } from "./realtime/socket";
+import { registerMatchmakingHandlers, startMatchmaker, stopMatchmaker } from "./services/matchmaking/matchmaking.service";
+import { loadOpenSessions, registerSessionHandlers } from "./services/sessions/session.service";
 
 /** How long in-flight requests get to finish before the process exits anyway. */
 const SHUTDOWN_GRACE_MS = 10_000;
 
 /** Stops new work arriving first (the port), then closes Postgres. */
-async function shutdown(server: Server, signal: string): Promise<void> {
+async function shutdown(signal: string): Promise<void> {
   logger.info("Shutting down", { signal });
 
   const forced = setTimeout(() => {
@@ -18,7 +21,10 @@ async function shutdown(server: Server, signal: string): Promise<void> {
   }, SHUTDOWN_GRACE_MS);
 
   try {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    stopMatchmaker();
+    // Closes the sockets and the HTTP server they are attached to. Rolls still waiting are
+    // refunded by startMatchmaker on the next boot.
+    await closeSocketServer();
     await prisma.$disconnect();
   } catch (err) {
     logger.error("Shutdown failed", { err: err instanceof Error ? err.message : String(err) });
@@ -37,8 +43,15 @@ async function start() {
     await prisma.$connect();
     logger.info("Connected to PostgreSQL");
 
-    // An explicit http.Server rather than app.listen: the chat socket will need `upgrade`.
+    // Before the port opens: rolls refuse users in a chat, and stranded rolls need refunding.
+    await loadOpenSessions();
+    await startMatchmaker();
+
+    // An explicit http.Server rather than app.listen, so Socket.IO can share the port.
     const server = createServer(app);
+    const io = attachSocketServer(server);
+    registerSessionHandlers(io);
+    registerMatchmakingHandlers(io);
 
     // Emitted, not thrown, so the try/catch never sees an occupied port.
     server.on("error", (err) => {
@@ -46,8 +59,8 @@ async function start() {
       process.exit(1);
     });
 
-    process.on("SIGTERM", () => void shutdown(server, "SIGTERM"));
-    process.on("SIGINT", () => void shutdown(server, "SIGINT"));
+    process.on("SIGTERM", () => void shutdown("SIGTERM"));
+    process.on("SIGINT", () => void shutdown("SIGINT"));
 
     server.listen(env.port, () => {
       logger.info(`Backend listening on port ${env.port}`);

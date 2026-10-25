@@ -99,7 +99,7 @@ export interface RouteSpecConfig {
   query?: z.AnyZodObject;
   body?: string | z.ZodTypeAny;
   successResponse: {
-    status: 200 | 201 | 204;
+    status: 200 | 201 | 202 | 204;
     description: string;
     /** A registered schema (or its name), returned as the whole body. */
     dataRef?: string | z.ZodTypeAny;

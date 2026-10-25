@@ -71,8 +71,61 @@ model User {
   ledgerEntries LedgerEntry[]
   purchases     Purchase[]
   matchFilter   MatchFilter?
+  matchTickets  MatchTicket[]
+  sessionsAsA   ChatSession[] @relation("SessionUserA")
+  sessionsAsB   ChatSession[] @relation("SessionUserB")
 
   @@map("users")
+}
+
+enum MatchTicketStatus {
+  waiting
+  matched
+  cancelled
+  /// Nobody was found in time. The Rolls were refunded.
+  expired
+}
+
+/// One roll. The live queue is in memory; this row is the money side (what was held) and what
+/// startup uses to refund rolls a crash left waiting.
+model MatchTicket {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status   MatchTicketStatus @default(waiting)
+  /// Rolls held for this roll: the base cost plus each filter that was on.
+  rollCost Int               @map("roll_cost")
+
+  sessionId String?      @map("session_id")
+  session   ChatSession? @relation(fields: [sessionId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime  @map("expires_at")
+  settledAt DateTime? @map("settled_at")
+
+  @@index([status])
+  @@index([userId, createdAt])
+  @@map("match_tickets")
+}
+
+/// A 1-on-1 chat between two matched users. Open while `endedAt` is null.
+model ChatSession {
+  id      String @id @default(uuid())
+  userAId String @map("user_a_id")
+  userA   User   @relation("SessionUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId String @map("user_b_id")
+  userB   User   @relation("SessionUserB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  /// Who left first. Null while open.
+  endedById String?   @map("ended_by_id")
+
+  tickets MatchTicket[]
+
+  @@index([endedAt])
+  @@map("chat_sessions")
 }
 
 /// Whether a country list means "only these" or "anyone but these".
@@ -163,12 +216,16 @@ model Settings {
   maxExtraIncludeSlots Int @default(3) @map("max_extra_include_slots")
   maxExtraExcludeSlots Int @default(1) @map("max_extra_exclude_slots")
 
+  /// How long a roll searches before it expires and refunds.
+  matchTimeoutSeconds Int @default(30) @map("match_timeout_seconds")
+
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
 }
 
-/// What a ledger entry records. More types arrive with matchmaking.
+/// What a ledger entry records. `hold` and `refund` carry 0: they move Rolls between
+/// available and held without changing what the user owns.
 enum LedgerEntryType {
   /// The one-time grant after onboarding.
   welcome
@@ -178,6 +235,12 @@ enum LedgerEntryType {
   purchase
   /// Rolls spent on something kept forever, like a country slot.
   unlock
+  /// Reserved for a roll while it searches.
+  hold
+  /// A held roll used up by a match.
+  spend
+  /// A held roll returned: nobody was found, or the roll was cancelled.
+  refund
 }
 
 /// A user's Rolls. Only ledger.service writes here, always with a ledger entry.

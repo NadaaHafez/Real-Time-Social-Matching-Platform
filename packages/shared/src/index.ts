@@ -11,5 +11,6 @@ export * from "./schemas/profile.schema";
 export * from "./schemas/rolls.schema";
 export * from "./schemas/payments.schema";
 export * from "./schemas/filters.schema";
+export * from "./schemas/matchmaking.schema";
 
 export * from "./registry";

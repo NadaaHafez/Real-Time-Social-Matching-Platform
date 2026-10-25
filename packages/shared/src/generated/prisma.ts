@@ -28,6 +28,10 @@ export const genderSchema = z.enum(["male", "female", "other"]).describe("Self-d
 export type Gender = z.infer<typeof genderSchema>;
 export const Gender = genderSchema.enum;
 
+export const matchTicketStatusSchema = z.enum(["waiting", "matched", "cancelled", "expired"]);
+export type MatchTicketStatus = z.infer<typeof matchTicketStatusSchema>;
+export const MatchTicketStatus = matchTicketStatusSchema.enum;
+
 /**
  * Whether a country list means "only these" or "anyone but these".
  */
@@ -36,9 +40,10 @@ export type CountryMode = z.infer<typeof countryModeSchema>;
 export const CountryMode = countryModeSchema.enum;
 
 /**
- * What a ledger entry records. More types arrive with matchmaking.
+ * What a ledger entry records. `hold` and `refund` carry 0: they move Rolls between
+ * available and held without changing what the user owns.
  */
-export const ledgerEntryTypeSchema = z.enum(["welcome", "bonus", "purchase", "unlock"]).describe("What a ledger entry records. More types arrive with matchmaking.");
+export const ledgerEntryTypeSchema = z.enum(["welcome", "bonus", "purchase", "unlock", "hold", "spend", "refund"]).describe("What a ledger entry records. `hold` and `refund` carry 0: they move Rolls between\navailable and held without changing what the user owns.");
 export type LedgerEntryType = z.infer<typeof ledgerEntryTypeSchema>;
 export const LedgerEntryType = ledgerEntryTypeSchema.enum;
 
@@ -95,6 +100,41 @@ export const userModelSchema = z.object({
   deletedAt: z.date().nullable().describe("Soft delete. See the extension in src/config/database.ts."),
 }).describe("A signed-in Pi account.");
 export type UserModel = z.infer<typeof userModelSchema>;
+
+/**
+ * One roll. The live queue is in memory; this row is the money side (what was held) and what
+ * startup uses to refund rolls a crash left waiting.
+ */
+export const matchTicketModelSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  status: matchTicketStatusSchema,
+  /**
+   * Rolls held for this roll: the base cost plus each filter that was on.
+   */
+  rollCost: z.number().int().describe("Rolls held for this roll: the base cost plus each filter that was on."),
+  sessionId: z.string().nullable(),
+  createdAt: z.date(),
+  expiresAt: z.date(),
+  settledAt: z.date().nullable(),
+}).describe("One roll. The live queue is in memory; this row is the money side (what was held) and what\nstartup uses to refund rolls a crash left waiting.");
+export type MatchTicketModel = z.infer<typeof matchTicketModelSchema>;
+
+/**
+ * A 1-on-1 chat between two matched users. Open while `endedAt` is null.
+ */
+export const chatSessionModelSchema = z.object({
+  id: z.string(),
+  userAId: z.string(),
+  userBId: z.string(),
+  startedAt: z.date(),
+  endedAt: z.date().nullable(),
+  /**
+   * Who left first. Null while open.
+   */
+  endedById: z.string().nullable().describe("Who left first. Null while open."),
+}).describe("A 1-on-1 chat between two matched users. Open while `endedAt` is null.");
+export type ChatSessionModel = z.infer<typeof chatSessionModelSchema>;
 
 /**
  * Who a user wants to match with. Matching is mutual. Created on first use. Values are kept
@@ -191,6 +231,10 @@ export const settingsModelSchema = z.object({
   excludeSlotPrice: z.number().int(),
   maxExtraIncludeSlots: z.number().int(),
   maxExtraExcludeSlots: z.number().int(),
+  /**
+   * How long a roll searches before it expires and refunds.
+   */
+  matchTimeoutSeconds: z.number().int().describe("How long a roll searches before it expires and refunds."),
   updatedAt: z.date(),
 }).describe("App-wide policy an admin can change without a deploy. Exactly one row, id 1, created\nwith these defaults the first time it is read.");
 export type SettingsModel = z.infer<typeof settingsModelSchema>;
@@ -289,6 +333,7 @@ export const prismaEnumSchemaComponents = {
   UserRole: userRoleSchema,
   UserStatus: userStatusSchema,
   Gender: genderSchema,
+  MatchTicketStatus: matchTicketStatusSchema,
   CountryMode: countryModeSchema,
   LedgerEntryType: ledgerEntryTypeSchema,
   PurchaseStatus: purchaseStatusSchema,

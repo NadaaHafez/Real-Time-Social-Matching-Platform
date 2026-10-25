@@ -5,6 +5,7 @@ import { authSchemaComponents } from "./schemas/auth.schema";
 import { commonSchemaComponents } from "./schemas/common.schema";
 import { profileSchemaComponents } from "./schemas/profile.schema";
 import { filtersSchemaComponents } from "./schemas/filters.schema";
+import { matchmakingSchemaComponents } from "./schemas/matchmaking.schema";
 import { paymentsSchemaComponents } from "./schemas/payments.schema";
 import { rollsSchemaComponents } from "./schemas/rolls.schema";
 
@@ -20,4 +21,5 @@ export const allSchemaComponents: Record<string, ZodTypeAny> = {
   ...rollsSchemaComponents,
   ...paymentsSchemaComponents,
   ...filtersSchemaComponents,
+  ...matchmakingSchemaComponents,
 };
