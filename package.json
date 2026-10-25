@@ -13,6 +13,7 @@
     "dev": "yarn build:shared && yarn workspace @social-matching/backend dev",
     "prisma:generate": "yarn workspace @social-matching/backend prisma:generate",
     "db:migrate": "yarn workspace @social-matching/backend prisma migrate deploy",
+    "demo:match": "yarn workspace @social-matching/backend demo:match",
     "typecheck": "yarn build:shared && yarn workspaces run typecheck"
   },
   "//": "One copy of the Express types. @types/swagger-ui-express otherwise nests @types/express v5 next to our v4, and the two are nominally different types.",
