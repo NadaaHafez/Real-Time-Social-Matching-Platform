@@ -61,6 +61,10 @@ model User {
   /// routes to onboarding.
   onboardedAt DateTime? @map("onboarded_at")
 
+  /// Set when a moderator warns this account, cleared when the user dismisses it. The
+  /// report that caused it is the record; this only says "still needs to be shown".
+  warnedAt DateTime? @map("warned_at")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   /// Soft delete. See the extension in src/config/database.ts.
@@ -75,7 +79,90 @@ model User {
   sessionsAsA   ChatSession[] @relation("SessionUserA")
   sessionsAsB   ChatSession[] @relation("SessionUserB")
 
+  // Back-relations: Prisma requires both sides of a relation. None of these are columns.
+  reportsFiled    Report[] @relation("ReportReporter")
+  reportsAgainst  Report[] @relation("ReportReported")
+  reportsReviewed Report[] @relation("ReportReviewer")
+  blocksMade      Block[]  @relation("BlockBlocker")
+  blocksAgainst   Block[]  @relation("BlockBlocked")
+
   @@map("users")
+}
+
+enum ReportReason {
+  harassment
+  sexual_content
+  scam_or_spam
+  underage
+  other
+}
+
+enum ReportStatus {
+  pending
+  actioned
+  dismissed
+}
+
+/// What a moderator did. `dismiss` closes the report without touching the user.
+enum ModerationAction {
+  warn
+  suspend
+  ban
+  dismiss
+}
+
+/// A user reporting their chat partner. Filing one ends the chat and blocks the pair.
+model Report {
+  id        String      @id @default(uuid())
+  sessionId String      @map("session_id")
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  reporterId     String @map("reporter_id")
+  reporter       User   @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUserId String @map("reported_user_id")
+  reportedUser   User   @relation("ReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
+
+  reason ReportReason
+  note   String?
+
+  /// The chat's last messages, frozen at report time: the only chat content ever stored.
+  /// [{ senderId, body, sentAt }]
+  messages Json
+
+  status ReportStatus @default(pending)
+
+  /// Set together when a moderator closes it: what they did, who, and why.
+  action       ModerationAction?
+  reviewedById String?           @map("reviewed_by_id")
+  reviewedBy   User?             @relation("ReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote   String?           @map("review_note")
+  reviewedAt   DateTime?         @map("reviewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// One report per person per chat.
+  @@unique([sessionId, reporterId])
+  /// The moderator queue, oldest pending first.
+  @@index([status, createdAt])
+  /// "Has this user been reported before?"
+  @@index([reportedUserId, createdAt])
+  @@map("reports")
+}
+
+/// One user hiding another. Created by reporting. Matching skips a pair blocked either way
+/// for Settings.blockHours after `createdAt`.
+model Block {
+  blockerId String @map("blocker_id")
+  blocker   User   @relation("BlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String @map("blocked_id")
+  blocked   User   @relation("BlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  /// Reset on a repeat report, which restarts the window.
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocks")
 }
 
 enum MatchTicketStatus {
@@ -109,6 +196,15 @@ model MatchTicket {
   @@map("match_tickets")
 }
 
+enum SessionEndReason {
+  /// One of them left.
+  left
+  /// One of them reported the other.
+  reported
+  /// A moderator suspended or banned one of them.
+  moderated
+}
+
 /// A 1-on-1 chat between two matched users. Open while `endedAt` is null.
 model ChatSession {
   id      String @id @default(uuid())
@@ -119,10 +215,12 @@ model ChatSession {
 
   startedAt DateTime  @default(now()) @map("started_at")
   endedAt   DateTime? @map("ended_at")
-  /// Who left first. Null while open.
-  endedById String?   @map("ended_by_id")
+  /// Who ended it. Null while open.
+  endedById   String?           @map("ended_by_id")
+  endedReason SessionEndReason? @map("ended_reason")
 
   tickets MatchTicket[]
+  reports Report[]
 
   @@index([endedAt])
   @@map("chat_sessions")
@@ -218,6 +316,9 @@ model Settings {
 
   /// How long a roll searches before it expires and refunds.
   matchTimeoutSeconds Int @default(30) @map("match_timeout_seconds")
+
+  /// After a report, the pair cannot be matched again for this long.
+  blockHours Int @default(72) @map("block_hours")
 
   updatedAt DateTime @updatedAt @map("updated_at")
 

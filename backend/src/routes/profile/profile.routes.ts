@@ -42,8 +42,16 @@ const updateProfileSpec = buildRouteSpec({
   },
 });
 
+const acknowledgeWarningSpec = buildRouteSpec({
+  summary: "Dismiss the pending warning",
+  description: "Clears `pendingWarning`. Safe to repeat: dismissing nothing succeeds.",
+  tags: TAGS,
+  successResponse: { status: 200, description: "The profile, with `pendingWarning: null`.", dataRef: profileSchema },
+});
+
 export const profileRoutePaths = {
   "/me/profile": { get: getProfileSpec, patch: updateProfileSpec },
+  "/me/warning/ack": { post: acknowledgeWarningSpec },
 };
 
 // ============================================================================
@@ -55,5 +63,6 @@ router.use(requireUser);
 
 router.get("/profile", profileController.getProfile);
 router.patch("/profile", validateBody(updateProfileRequestSchema), profileController.updateProfile);
+router.post("/warning/ack", profileController.acknowledgeWarning);
 
 export default router;

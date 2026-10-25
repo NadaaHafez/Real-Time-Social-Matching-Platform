@@ -42,6 +42,14 @@ export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
 // RESPONSES
 // ============================================================================
 
+export const pendingWarningSchema = z
+  .object({
+    issuedAt: z.string().datetime(),
+    message: z.string().describe("Fixed wording. A moderator decides whether to warn, not what it says."),
+  })
+  .describe("Show once, then dismiss with POST /me/warning/ack. A warning restricts nothing.");
+export type PendingWarning = z.infer<typeof pendingWarningSchema>;
+
 /**
  * No `status`: requireUser refuses suspended and banned accounts before this is ever built,
  * so it would always say `active`.
@@ -63,6 +71,7 @@ export const profileSchema = z
         "Same meaning as on sign-in: onboarding is unfinished. Flips to false in the PATCH " +
           "response that sets the last of age, gender and country.",
       ),
+    pendingWarning: pendingWarningSchema.nullable().describe("Null for almost everyone."),
     createdAt: z.string().datetime(),
   })
   .describe("The signed-in user's own profile.");
@@ -74,5 +83,6 @@ export type Profile = z.infer<typeof profileSchema>;
 
 export const profileSchemaComponents = {
   UpdateProfileRequest: updateProfileRequestSchema,
+  PendingWarning: pendingWarningSchema,
   Profile: profileSchema,
 };

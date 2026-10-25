@@ -65,6 +65,11 @@ export function isOnline(userId: string): boolean {
   return (io?.sockets.adapter.rooms.get(userRoom(userId))?.size ?? 0) > 0;
 }
 
+/** Closes every socket of a user, for example after a ban. The handshake refuses them on reconnect. */
+export function disconnectUser(userId: string): void {
+  io?.in(userRoom(userId)).disconnectSockets(true);
+}
+
 export function emitToUser<E extends keyof ServerToClientEvents>(
   userId: string,
   event: E,

@@ -15,3 +15,7 @@ export const getProfile = asyncHandler<Profile>(async (req, res) => {
 export const updateProfile = asyncHandler<Profile, UpdateProfileRequest>(async (req, res) => {
   res.status(200).json(await profileService.updateProfile(req.currentUser!.id, req.body));
 });
+
+export const acknowledgeWarning = asyncHandler<Profile>(async (req, res) => {
+  res.status(200).json(await profileService.acknowledgeWarning(req.currentUser!.id));
+});

@@ -6,6 +6,7 @@ import { emitToUser, isOnline } from "../../realtime/socket";
 import type { CurrentUser } from "../../types/express";
 import { HttpError } from "../../utils/httpError";
 import { lockSnapshot, rollCostOf } from "../filters/filters.service";
+import { blockedPartnersOf } from "../moderation/block.service";
 import * as ledger from "../rolls/ledger.service";
 import { createSession, markOpen, openSessionOf, partnerSummary } from "../sessions/session.service";
 import { getSettings } from "../settings/settings.service";
@@ -57,14 +58,24 @@ export async function roll(user: CurrentUser): Promise<RollResponse> {
 
     const settings = await getSettings();
     const expiresAt = new Date(Date.now() + settings.matchTimeoutSeconds * 1000);
+    const blocked = await blockedPartnersOf(user.id, settings.blockHours);
 
     // Ticket and hold together: a hold with no ticket would strand Rolls, a ticket with no
     // hold would let them be spent twice.
     const { ticket, filters, balance } = await prisma.$transaction(async (tx) => {
       const filters = await lockSnapshot(tx, user.id);
       const rollCost = rollCostOf(filters, settings);
-      const ticket = await tx.matchTicket.create({ data: { userId: user.id, rollCost, expiresAt }, select: { id: true, rollCost: true } });
-      const { balance } = await ledger.hold({ userId: user.id, amount: rollCost, ref: ticket.id, idempotencyKey: `hold:${ticket.id}` }, tx);
+
+      const ticket = await tx.matchTicket.create({
+        data: { userId: user.id, rollCost, expiresAt },
+        select: { id: true, rollCost: true },
+      });
+
+      const { balance } = await ledger.hold(
+        { userId: user.id, amount: rollCost, ref: ticket.id, idempotencyKey: `hold:${ticket.id}` },
+        tx,
+      );
+
       return { ticket, filters, balance };
     });
 
@@ -77,6 +88,7 @@ export async function roll(user: CurrentUser): Promise<RollResponse> {
       filters,
       // Only ever written by updateProfile, after validation against the shared list.
       profile: { age: profile.age, gender: profile.gender, country: profile.country as CountryCode },
+      blocked,
     });
     ticketByUser.set(user.id, ticket.id);
 
@@ -239,6 +251,12 @@ export function stopMatchmaker(): void {
 
 export function queueStats(): QueueStats {
   return { waiting: waiting.size };
+}
+
+/** A moderator suspended or banned the user: their search ends now, refunded. */
+export async function cancelSearchOf(userId: string): Promise<void> {
+  const ticketId = ticketByUser.get(userId);
+  if (ticketId && ticketId !== PENDING) await endTicket({ id: ticketId, userId }, "cancelled");
 }
 
 /**

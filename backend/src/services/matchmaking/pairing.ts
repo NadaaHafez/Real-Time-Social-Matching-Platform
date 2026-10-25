@@ -20,6 +20,8 @@ export interface WaitingTicket {
   filters: FilterSnapshot;
   /** What other people's filters are checked against. */
   profile: Profile;
+  /** Users this one was blocked with (either way), read once at roll time. */
+  blocked: Set<string>;
 }
 
 /** Does `viewer`'s filter accept `other`'s profile? One direction; matching checks both. */
@@ -34,7 +36,10 @@ function accepts(viewer: FilterSnapshot, other: Profile): boolean {
 }
 
 export function compatible(a: WaitingTicket, b: WaitingTicket): boolean {
-  return a.userId !== b.userId && accepts(a.filters, b.profile) && accepts(b.filters, a.profile);
+  if (a.userId === b.userId) return false;
+  if (a.blocked.has(b.userId) || b.blocked.has(a.userId)) return false;
+
+  return accepts(a.filters, b.profile) && accepts(b.filters, a.profile);
 }
 
 /**

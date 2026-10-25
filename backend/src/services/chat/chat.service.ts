@@ -15,11 +15,11 @@ import { onSessionEnded, openSessionOf, partnerIn, partnerSummary } from "../ses
 const TRANSCRIPT_LIMIT = 20;
 const RATE_LIMIT = { messages: 5, perMs: 1000 };
 
-export interface TranscriptLine {
+export type TranscriptLine = {
   senderId: string;
   body: string;
   sentAt: string;
-}
+};
 
 const transcripts = new Map<string, TranscriptLine[]>();
 const recentSends = new Map<string, number[]>();

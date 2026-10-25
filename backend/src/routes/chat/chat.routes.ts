@@ -1,10 +1,11 @@
 import { Router } from "express";
 
-import { currentChatResponseSchema } from "@social-matching/shared";
+import { currentChatResponseSchema, reportRequestSchema } from "@social-matching/shared";
 
 import * as chatController from "../../controllers/chat/chat.controller";
-import { buildRouteSpec } from "../../docs/defineRoute";
+import { buildRouteSpec, errorResponse } from "../../docs/defineRoute";
 import { requireUser } from "../../middleware/auth";
+import { validateBody } from "../../middleware/validation";
 
 const router = Router();
 
@@ -26,8 +27,24 @@ const getCurrentSpec = buildRouteSpec({
   successResponse: { status: 200, description: "The open chat, or `chat: null`.", dataRef: currentChatResponseSchema },
 });
 
+const reportSpec = buildRouteSpec({
+  summary: "Report your chat partner",
+  description:
+    "Saves the chat's last messages as evidence, ends the chat, and stops the two of you " +
+    "being matched again for Settings.blockHours (72 h by default). Your partner is only " +
+    "told you left.",
+  tags: ["Chat"],
+  body: reportRequestSchema,
+  successResponse: { status: 204, description: "Reported, and the chat is over." },
+  errors: ["validation", "unauthorized", "forbidden", "rateLimited", "internal"],
+  extraResponses: {
+    404: errorResponse("Not in that open chat — `session_not_found`."),
+  },
+});
+
 export const chatRoutePaths = {
   "/chat/current": { get: getCurrentSpec },
+  "/chat/report": { post: reportSpec },
 };
 
 // ============================================================================
@@ -37,5 +54,6 @@ export const chatRoutePaths = {
 router.use(requireUser);
 
 router.get("/current", chatController.getCurrent);
+router.post("/report", validateBody(reportRequestSchema), chatController.report);
 
 export default router;

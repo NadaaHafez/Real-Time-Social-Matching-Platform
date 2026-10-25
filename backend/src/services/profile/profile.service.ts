@@ -14,12 +14,18 @@ const PROFILE_FIELDS = {
   country: true,
   iceBreaker: true,
   onboardedAt: true,
+  warnedAt: true,
   createdAt: true,
 } as const satisfies Partial<Record<keyof UserModel, true>>;
 
 type ProfileRecord = Pick<UserModel, keyof typeof PROFILE_FIELDS>;
 
 const USER_GONE = () => HttpError.notFound("user_not_found", "This account no longer exists.");
+
+/** One fixed wording: a moderator decides whether to warn, not what it says. */
+const WARNING_MESSAGE =
+  "A moderator reviewed a report about one of your chats. Please keep conversations respectful. " +
+  "Further reports may lead to a suspension.";
 
 /** The database row → the API shape. */
 function toProfile(user: ProfileRecord): Profile {
@@ -32,8 +38,15 @@ function toProfile(user: ProfileRecord): Profile {
     country: user.country as CountryCode | null,
     iceBreaker: user.iceBreaker,
     isNewUser: user.onboardedAt === null,
+    pendingWarning: user.warnedAt ? { issuedAt: user.warnedAt.toISOString(), message: WARNING_MESSAGE } : null,
     createdAt: user.createdAt.toISOString(),
   };
+}
+
+/** Marks the warning seen. Safe to repeat: dismissing nothing succeeds. */
+export async function acknowledgeWarning(userId: string): Promise<Profile> {
+  const user = await prisma.user.update({ where: { id: userId }, data: { warnedAt: null }, select: PROFILE_FIELDS });
+  return toProfile(user);
 }
 
 export async function getProfile(userId: string): Promise<Profile> {

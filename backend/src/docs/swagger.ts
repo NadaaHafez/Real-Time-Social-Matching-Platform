@@ -1,4 +1,5 @@
 import env from "../config/env";
+import { adminRoutePaths } from "../routes/admin/admin.routes";
 import { authRoutePaths } from "../routes/auth/auth.routes";
 import { chatRoutePaths } from "../routes/chat/chat.routes";
 import { devRoutePaths } from "../routes/dev/dev.routes";
@@ -55,6 +56,7 @@ const paths = {
   ...paymentsRoutePaths,
   ...matchmakingRoutePaths,
   ...chatRoutePaths,
+  ...adminRoutePaths,
   // Documented only where app.ts mounts it.
   ...(env.isProduction ? {} : devRoutePaths),
 };
@@ -75,6 +77,7 @@ export const swaggerSpec = {
     { name: "Payments", description: "Buying Roll packs with Pi, through the Pi SDK's U2A payment flow." },
     { name: "Matchmaking", description: "Searching for a partner. Outcomes arrive over Socket.IO." },
     { name: "Chat", description: "1-on-1 chat. Messages travel over Socket.IO and are never stored." },
+    { name: "Admin", description: "Moderators and owners: the report queue and its decisions." },
     ...(env.isProduction ? [] : [{ name: "Dev", description: "Development only. Not mounted in production." }]),
   ],
   components: {

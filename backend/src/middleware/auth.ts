@@ -1,3 +1,4 @@
+import type { UserRole } from "@social-matching/shared";
 import { NextFunction, Request, Response } from "express";
 
 import prisma from "../config/database";
@@ -21,7 +22,7 @@ export async function authenticate(token: string, context: { path: string; ip?: 
 
   const user = await prisma.user.findUnique({
     where: { id: claims.sub },
-    select: { id: true, piUserId: true, username: true, status: true, suspendedUntil: true },
+    select: { id: true, piUserId: true, username: true, role: true, status: true, suspendedUntil: true },
   });
 
   if (!user) {
@@ -43,7 +44,23 @@ export async function authenticate(token: string, context: { path: string; ip?: 
     throw HttpError.forbidden(`account_${user.status}`, blockedMessage(user));
   }
 
-  return { id: user.id, piUserId: user.piUserId, username: user.username };
+  return { id: user.id, piUserId: user.piUserId, username: user.username, role: user.role };
+}
+
+const ROLE_RANK: Record<UserRole, number> = { user: 0, moderator: 1, owner: 2 };
+
+/** Mount after requireUser. `requireRole("moderator")` also lets owners through. */
+export function requireRole(minimum: Exclude<UserRole, "user">) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const role = req.currentUser?.role ?? "user";
+
+    if (ROLE_RANK[role] < ROLE_RANK[minimum]) {
+      next(HttpError.forbidden("insufficient_role", "You do not have access to this."));
+      return;
+    }
+
+    next();
+  };
 }
 
 /** Gate for every route that acts on behalf of a user. */

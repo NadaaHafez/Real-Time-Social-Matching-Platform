@@ -1,4 +1,4 @@
-import type { CountryCode, Gender, PartnerSummary } from "@social-matching/shared";
+import type { CountryCode, Gender, PartnerSummary, SessionEndReason } from "@social-matching/shared";
 
 import prisma, { TransactionClient } from "../../config/database";
 import env from "../../config/env";
@@ -89,23 +89,32 @@ export function partnerSummary(partner: {
   };
 }
 
-export async function leaveSession(userId: string, sessionId: string): Promise<void> {
-  const partnerId = partnerIn(sessionId, userId);
+/**
+ * Ends a session on behalf of `actorId`: leaving, reporting, or a moderator removing them.
+ * The actor is told `you_left` and the other side `partner_left`, so a reported user is never
+ * told they were reported.
+ */
+export async function endSession(sessionId: string, actorId: string, reason: SessionEndReason): Promise<void> {
+  const partnerId = partnerIn(sessionId, actorId);
   if (!partnerId) throw HttpError.notFound("session_not_found", "No open chat with that id.");
 
   // The endedAt condition means a double leave, or both leaving at once, ends it only once.
   const { count } = await prisma.chatSession.updateMany({
     where: { id: sessionId, endedAt: null },
-    data: { endedAt: new Date(), endedById: userId },
+    data: { endedAt: new Date(), endedById: actorId, endedReason: reason },
   });
   if (count === 0) return;
 
   openSessions.delete(sessionId);
-  openSessionByUser.delete(userId);
+  openSessionByUser.delete(actorId);
   openSessionByUser.delete(partnerId);
   for (const listener of endedListeners) listener(sessionId);
 
-  emitToUser(userId, "session:ended", { sessionId, reason: "you_left" });
+  emitToUser(actorId, "session:ended", { sessionId, reason: "you_left" });
   emitToUser(partnerId, "session:ended", { sessionId, reason: "partner_left" });
-  logger.info("Chat session ended", { sessionId, endedBy: userId });
+  logger.info("Chat session ended", { sessionId, endedBy: actorId, reason });
+}
+
+export function leaveSession(userId: string, sessionId: string): Promise<void> {
+  return endSession(sessionId, userId, "left");
 }

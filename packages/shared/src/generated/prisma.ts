@@ -28,9 +28,28 @@ export const genderSchema = z.enum(["male", "female", "other"]).describe("Self-d
 export type Gender = z.infer<typeof genderSchema>;
 export const Gender = genderSchema.enum;
 
+export const reportReasonSchema = z.enum(["harassment", "sexual_content", "scam_or_spam", "underage", "other"]);
+export type ReportReason = z.infer<typeof reportReasonSchema>;
+export const ReportReason = reportReasonSchema.enum;
+
+export const reportStatusSchema = z.enum(["pending", "actioned", "dismissed"]);
+export type ReportStatus = z.infer<typeof reportStatusSchema>;
+export const ReportStatus = reportStatusSchema.enum;
+
+/**
+ * What a moderator did. `dismiss` closes the report without touching the user.
+ */
+export const moderationActionSchema = z.enum(["warn", "suspend", "ban", "dismiss"]).describe("What a moderator did. `dismiss` closes the report without touching the user.");
+export type ModerationAction = z.infer<typeof moderationActionSchema>;
+export const ModerationAction = moderationActionSchema.enum;
+
 export const matchTicketStatusSchema = z.enum(["waiting", "matched", "cancelled", "expired"]);
 export type MatchTicketStatus = z.infer<typeof matchTicketStatusSchema>;
 export const MatchTicketStatus = matchTicketStatusSchema.enum;
+
+export const sessionEndReasonSchema = z.enum(["left", "reported", "moderated"]);
+export type SessionEndReason = z.infer<typeof sessionEndReasonSchema>;
+export const SessionEndReason = sessionEndReasonSchema.enum;
 
 /**
  * Whether a country list means "only these" or "anyone but these".
@@ -92,6 +111,11 @@ export const userModelSchema = z.object({
    * routes to onboarding.
    */
   onboardedAt: z.date().nullable().describe("Set the first time age, gender and country are all filled in. Null means the client\nroutes to onboarding."),
+  /**
+   * Set when a moderator warns this account, cleared when the user dismisses it. The
+   * report that caused it is the record; this only says "still needs to be shown".
+   */
+  warnedAt: z.date().nullable().describe("Set when a moderator warns this account, cleared when the user dismisses it. The\nreport that caused it is the record; this only says \"still needs to be shown\"."),
   createdAt: z.date(),
   updatedAt: z.date(),
   /**
@@ -100,6 +124,47 @@ export const userModelSchema = z.object({
   deletedAt: z.date().nullable().describe("Soft delete. See the extension in src/config/database.ts."),
 }).describe("A signed-in Pi account.");
 export type UserModel = z.infer<typeof userModelSchema>;
+
+/**
+ * A user reporting their chat partner. Filing one ends the chat and blocks the pair.
+ */
+export const reportModelSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  reporterId: z.string(),
+  reportedUserId: z.string(),
+  reason: reportReasonSchema,
+  note: z.string().nullable(),
+  /**
+   * The chat's last messages, frozen at report time: the only chat content ever stored.
+   * [{ senderId, body, sentAt }]
+   */
+  messages: z.unknown().describe("The chat's last messages, frozen at report time: the only chat content ever stored.\n[{ senderId, body, sentAt }]"),
+  status: reportStatusSchema,
+  /**
+   * Set together when a moderator closes it: what they did, who, and why.
+   */
+  action: moderationActionSchema.nullable().describe("Set together when a moderator closes it: what they did, who, and why."),
+  reviewedById: z.string().nullable(),
+  reviewNote: z.string().nullable(),
+  reviewedAt: z.date().nullable(),
+  createdAt: z.date(),
+}).describe("A user reporting their chat partner. Filing one ends the chat and blocks the pair.");
+export type ReportModel = z.infer<typeof reportModelSchema>;
+
+/**
+ * One user hiding another. Created by reporting. Matching skips a pair blocked either way
+ * for Settings.blockHours after `createdAt`.
+ */
+export const blockModelSchema = z.object({
+  blockerId: z.string(),
+  blockedId: z.string(),
+  /**
+   * Reset on a repeat report, which restarts the window.
+   */
+  createdAt: z.date().describe("Reset on a repeat report, which restarts the window."),
+}).describe("One user hiding another. Created by reporting. Matching skips a pair blocked either way\nfor Settings.blockHours after `createdAt`.");
+export type BlockModel = z.infer<typeof blockModelSchema>;
 
 /**
  * One roll. The live queue is in memory; this row is the money side (what was held) and what
@@ -130,9 +195,10 @@ export const chatSessionModelSchema = z.object({
   startedAt: z.date(),
   endedAt: z.date().nullable(),
   /**
-   * Who left first. Null while open.
+   * Who ended it. Null while open.
    */
-  endedById: z.string().nullable().describe("Who left first. Null while open."),
+  endedById: z.string().nullable().describe("Who ended it. Null while open."),
+  endedReason: sessionEndReasonSchema.nullable(),
 }).describe("A 1-on-1 chat between two matched users. Open while `endedAt` is null.");
 export type ChatSessionModel = z.infer<typeof chatSessionModelSchema>;
 
@@ -235,6 +301,10 @@ export const settingsModelSchema = z.object({
    * How long a roll searches before it expires and refunds.
    */
   matchTimeoutSeconds: z.number().int().describe("How long a roll searches before it expires and refunds."),
+  /**
+   * After a report, the pair cannot be matched again for this long.
+   */
+  blockHours: z.number().int().describe("After a report, the pair cannot be matched again for this long."),
   updatedAt: z.date(),
 }).describe("App-wide policy an admin can change without a deploy. Exactly one row, id 1, created\nwith these defaults the first time it is read.");
 export type SettingsModel = z.infer<typeof settingsModelSchema>;
@@ -333,7 +403,11 @@ export const prismaEnumSchemaComponents = {
   UserRole: userRoleSchema,
   UserStatus: userStatusSchema,
   Gender: genderSchema,
+  ReportReason: reportReasonSchema,
+  ReportStatus: reportStatusSchema,
+  ModerationAction: moderationActionSchema,
   MatchTicketStatus: matchTicketStatusSchema,
+  SessionEndReason: sessionEndReasonSchema,
   CountryMode: countryModeSchema,
   LedgerEntryType: ledgerEntryTypeSchema,
   PurchaseStatus: purchaseStatusSchema,
