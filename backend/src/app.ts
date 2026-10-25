@@ -52,8 +52,9 @@ app.use(
 
 app.get("/docs", (_req, res) => res.redirect("/api-docs"));
 
-// Never mounted in production. That absence is the only thing guarding these routes.
-if (!env.isProduction) {
+// Never mounted on a real production deployment, only in development and on a public demo.
+// That absence is the only thing guarding these routes.
+if (env.devToolsEnabled) {
   app.use("/dev", devRoutes);
 }
 

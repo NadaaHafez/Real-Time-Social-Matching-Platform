@@ -22,6 +22,11 @@ import { generateSchemaComponents } from "./zodToOpenApi";
  * `registerLocalSchema` calls, so the registry is complete by the time it is read below.
  */
 
+const DEMO_NOTE = `
+> **Demo instance.** Sign in as anyone with \`POST /dev/signin\` \`{ "username": "alice" }\`, then paste
+> \`tokens.accessToken\` into **Authorize**. Data may be wiped at any time.
+`.trim();
+
 const DESCRIPTION = `
 REST API for the Real-Time Social Matching Platform, a Pi Network app.
 
@@ -60,12 +65,16 @@ const paths = {
   ...chatRoutePaths,
   ...adminRoutePaths,
   // Documented only where app.ts mounts it.
-  ...(env.isProduction ? {} : devRoutePaths),
+  ...(env.devToolsEnabled ? devRoutePaths : {}),
 };
 
 export const swaggerSpec = {
   openapi: "3.0.0",
-  info: { title: "Social Matching API", version: "0.1.0", description: DESCRIPTION },
+  info: {
+    title: env.demoMode ? "Social Matching API (demo)" : "Social Matching API",
+    version: "0.1.0",
+    description: env.demoMode ? `${DEMO_NOTE}\n\n${DESCRIPTION}` : DESCRIPTION,
+  },
   servers: [
     { url: "/", description: "This server" },
     { url: `http://localhost:${env.port}`, description: "Local development" },
@@ -81,7 +90,7 @@ export const swaggerSpec = {
     { name: "Matchmaking", description: "Searching for a partner. Outcomes arrive over Socket.IO." },
     { name: "Chat", description: "1-on-1 chat. Messages travel over Socket.IO and are never stored." },
     { name: "Admin", description: "Moderators and owners: the report queue and its decisions." },
-    ...(env.isProduction ? [] : [{ name: "Dev", description: "Development only. Not mounted in production." }]),
+    ...(env.devToolsEnabled ? [{ name: "Dev", description: "Development and demo only. Not mounted in production." }] : []),
   ],
   components: {
     schemas: generateSchemaComponents(getSchemaRegistry()),

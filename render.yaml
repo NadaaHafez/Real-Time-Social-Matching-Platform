@@ -1,0 +1,31 @@
+# Render Blueprint for the public demo: Render → New → Blueprint → pick this repo.
+# The database is external (Neon): paste its connection string into DATABASE_URL when asked.
+services:
+  - type: web
+    name: social-matching-api
+    runtime: node
+    plan: free
+    # One instance only: the match queue and caches live in memory.
+    numInstances: 1
+    # devDependencies too: TypeScript and the Prisma CLI are needed to build and migrate.
+    buildCommand: yarn install --frozen-lockfile --production=false && yarn prisma:generate && yarn build
+    # Migrations run on start because the free plan has no pre-deploy step. Already-applied ones are skipped.
+    startCommand: yarn db:migrate && node backend/dist/src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: PI_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: http://localhost:3000
