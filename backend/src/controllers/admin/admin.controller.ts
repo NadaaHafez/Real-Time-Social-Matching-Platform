@@ -2,6 +2,8 @@ import type {
   AdminMe,
   AdminPack,
   AppSettings,
+  LegalDocument,
+  PublishLegalRequest,
   ReportDetail,
   ReportListQuery,
   ReportsPage,
@@ -10,6 +12,7 @@ import type {
   UpdateSettingsRequest,
 } from "@social-matching/shared";
 
+import * as legalService from "../../services/legal/legal.service";
 import * as reviewService from "../../services/moderation/review.service";
 import * as paymentsService from "../../services/payments/payments.service";
 import * as settingsService from "../../services/settings/settings.service";
@@ -55,4 +58,8 @@ export const listPacks = asyncHandler<AdminPack[]>(async (_req, res) => {
 
 export const savePack = asyncHandler<AdminPack, SavePackRequest>(async (req, res) => {
   res.status(200).json(await paymentsService.savePack(req.params.packId, req.body, req.currentUser!));
+});
+
+export const publishLegal = asyncHandler<LegalDocument, PublishLegalRequest>(async (req, res) => {
+  res.status(201).json(await legalService.publish(req.body, req.currentUser!));
 });

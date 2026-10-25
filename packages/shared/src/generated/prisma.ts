@@ -28,6 +28,13 @@ export const genderSchema = z.enum(["male", "female", "other"]).describe("Self-d
 export type Gender = z.infer<typeof genderSchema>;
 export const Gender = genderSchema.enum;
 
+/**
+ * Terms are accepted per revision; the privacy policy is only shown.
+ */
+export const legalDocumentTypeSchema = z.enum(["terms", "privacy"]).describe("Terms are accepted per revision; the privacy policy is only shown.");
+export type LegalDocumentType = z.infer<typeof legalDocumentTypeSchema>;
+export const LegalDocumentType = legalDocumentTypeSchema.enum;
+
 export const reportReasonSchema = z.enum(["harassment", "sexual_content", "scam_or_spam", "underage", "other"]);
 export type ReportReason = z.infer<typeof reportReasonSchema>;
 export const ReportReason = reportReasonSchema.enum;
@@ -124,6 +131,41 @@ export const userModelSchema = z.object({
   deletedAt: z.date().nullable().describe("Soft delete. See the extension in src/config/database.ts."),
 }).describe("A signed-in Pi account.");
 export type UserModel = z.infer<typeof userModelSchema>;
+
+/**
+ * One published revision. Never edited: a change is a new revision, so the exact wording a
+ * user accepted can always be read back.
+ */
+export const legalDocumentModelSchema = z.object({
+  id: z.string(),
+  type: legalDocumentTypeSchema,
+  /**
+   * Previous + 1, assigned by the server. Shown as "v3".
+   */
+  revision: z.number().int().describe("Previous + 1, assigned by the server. Shown as \"v3\"."),
+  title: z.string(),
+  /**
+   * Markdown.
+   */
+  content: z.string().describe("Markdown."),
+  /**
+   * Terms only: asks everyone to accept again. A wording fix leaves it false.
+   */
+  requiresReaccept: z.boolean().describe("Terms only: asks everyone to accept again. A wording fix leaves it false."),
+  publishedById: z.string().nullable(),
+  publishedAt: z.date(),
+}).describe("One published revision. Never edited: a change is a new revision, so the exact wording a\nuser accepted can always be read back.");
+export type LegalDocumentModel = z.infer<typeof legalDocumentModelSchema>;
+
+/**
+ * Evidence that a user accepted one exact revision. Append-only.
+ */
+export const legalAcceptanceModelSchema = z.object({
+  userId: z.string(),
+  documentId: z.string(),
+  acceptedAt: z.date(),
+}).describe("Evidence that a user accepted one exact revision. Append-only.");
+export type LegalAcceptanceModel = z.infer<typeof legalAcceptanceModelSchema>;
 
 /**
  * A user reporting their chat partner. Filing one ends the chat and blocks the pair.
@@ -403,6 +445,7 @@ export const prismaEnumSchemaComponents = {
   UserRole: userRoleSchema,
   UserStatus: userStatusSchema,
   Gender: genderSchema,
+  LegalDocumentType: legalDocumentTypeSchema,
   ReportReason: reportReasonSchema,
   ReportStatus: reportStatusSchema,
   ModerationAction: moderationActionSchema,

@@ -7,6 +7,7 @@ import { chatSchemaComponents } from "./schemas/chat.schema";
 import { commonSchemaComponents } from "./schemas/common.schema";
 import { profileSchemaComponents } from "./schemas/profile.schema";
 import { filtersSchemaComponents } from "./schemas/filters.schema";
+import { legalSchemaComponents } from "./schemas/legal.schema";
 import { matchmakingSchemaComponents } from "./schemas/matchmaking.schema";
 import { moderationSchemaComponents } from "./schemas/moderation.schema";
 import { paymentsSchemaComponents } from "./schemas/payments.schema";
@@ -28,4 +29,5 @@ export const allSchemaComponents: Record<string, ZodTypeAny> = {
   ...chatSchemaComponents,
   ...moderationSchemaComponents,
   ...adminSchemaComponents,
+  ...legalSchemaComponents,
 };

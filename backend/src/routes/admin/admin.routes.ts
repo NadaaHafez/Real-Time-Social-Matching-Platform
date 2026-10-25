@@ -4,7 +4,9 @@ import {
   adminMeSchema,
   adminPackSchema,
   appSettingsSchema,
+  legalDocumentSchema,
   packIdParamsSchema,
+  publishLegalRequestSchema,
   reportDetailSchema,
   reportIdParamsSchema,
   reportListQuerySchema,
@@ -115,6 +117,22 @@ const savePackSpec = buildRouteSpec({
   extraResponses: { 403: OWNER_ONLY },
 });
 
+const publishLegalSpec = buildRouteSpec({
+  summary: "Publish terms or privacy policy",
+  description:
+    "Owners only. Adds the next revision; published text is never edited. For terms, " +
+    "`requiresReaccept: true` asks every user to accept again before their next roll. Leave it " +
+    "out for a wording fix.",
+  tags: TAGS,
+  body: publishLegalRequestSchema,
+  successResponse: { status: 201, description: "The new revision.", dataRef: legalDocumentSchema },
+  errors: [...ADMIN_ERRORS],
+  extraResponses: {
+    403: OWNER_ONLY,
+    409: errorResponse("Another publish took this revision a moment earlier — `publish_conflict`."),
+  },
+});
+
 export const adminRoutePaths = {
   "/admin/me": { get: getMeSpec },
   "/admin/reports": { get: listReportsSpec },
@@ -123,6 +141,7 @@ export const adminRoutePaths = {
   "/admin/settings": { get: getSettingsSpec, patch: updateSettingsSpec },
   "/admin/packs": { get: listPacksSpec },
   "/admin/packs/{packId}": { put: savePackSpec },
+  "/admin/legal": { post: publishLegalSpec },
 };
 
 // ============================================================================
@@ -154,5 +173,6 @@ router.put(
   validateBody(savePackRequestSchema),
   adminController.savePack,
 );
+router.post("/legal", owner, validateBody(publishLegalRequestSchema), adminController.publishLegal);
 
 export default router;

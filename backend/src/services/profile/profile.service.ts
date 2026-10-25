@@ -3,6 +3,7 @@ import type { CountryCode, Profile, UpdateProfileRequest, UserModel } from "@soc
 import prisma from "../../config/database";
 import logger from "../../config/logger";
 import { HttpError } from "../../utils/httpError";
+import * as legalService from "../legal/legal.service";
 import { getSettings } from "../settings/settings.service";
 
 /** `satisfies` ties every key to a real User column, so a typo stops compiling. */
@@ -27,8 +28,8 @@ const WARNING_MESSAGE =
   "A moderator reviewed a report about one of your chats. Please keep conversations respectful. " +
   "Further reports may lead to a suspension.";
 
-/** The database row → the API shape. */
-function toProfile(user: ProfileRecord): Profile {
+/** The database row → the API shape. The terms check is cached, so this rarely queries. */
+async function toProfile(userId: string, user: ProfileRecord): Promise<Profile> {
   return {
     uid: user.piUserId,
     username: user.username,
@@ -38,6 +39,7 @@ function toProfile(user: ProfileRecord): Profile {
     country: user.country as CountryCode | null,
     iceBreaker: user.iceBreaker,
     isNewUser: user.onboardedAt === null,
+    needsTermsAcceptance: await legalService.needsTermsAcceptance(userId),
     pendingWarning: user.warnedAt ? { issuedAt: user.warnedAt.toISOString(), message: WARNING_MESSAGE } : null,
     createdAt: user.createdAt.toISOString(),
   };
@@ -46,7 +48,13 @@ function toProfile(user: ProfileRecord): Profile {
 /** Marks the warning seen. Safe to repeat: dismissing nothing succeeds. */
 export async function acknowledgeWarning(userId: string): Promise<Profile> {
   const user = await prisma.user.update({ where: { id: userId }, data: { warnedAt: null }, select: PROFILE_FIELDS });
-  return toProfile(user);
+  return toProfile(userId, user);
+}
+
+/** Accepts the current terms and hands back the profile, with `needsTermsAcceptance` now false. */
+export async function acceptTerms(userId: string, documentId: string): Promise<Profile> {
+  await legalService.acceptTerms(userId, documentId);
+  return getProfile(userId);
 }
 
 export async function getProfile(userId: string): Promise<Profile> {
@@ -55,7 +63,7 @@ export async function getProfile(userId: string): Promise<Profile> {
   // requireUser just found this user, so only an account closed in between lands here.
   if (!user) throw USER_GONE();
 
-  return toProfile(user);
+  return toProfile(userId, user);
 }
 
 /**
@@ -100,5 +108,5 @@ export async function updateProfile(userId: string, patch: UpdateProfileRequest)
     logger.info("Onboarding finished", { userId, username: user.username });
   }
 
-  return toProfile(user);
+  return toProfile(userId, user);
 }

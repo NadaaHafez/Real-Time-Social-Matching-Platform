@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { profileSchema, updateProfileRequestSchema } from "@social-matching/shared";
+import { acceptTermsRequestSchema, profileSchema, updateProfileRequestSchema } from "@social-matching/shared";
 
 import * as profileController from "../../controllers/profile/profile.controller";
 import { buildRouteSpec, errorResponse } from "../../docs/defineRoute";
@@ -49,8 +49,23 @@ const acknowledgeWarningSpec = buildRouteSpec({
   successResponse: { status: 200, description: "The profile, with `pendingWarning: null`.", dataRef: profileSchema },
 });
 
+const acceptTermsSpec = buildRouteSpec({
+  summary: "Accept the current terms",
+  description:
+    "Records consent to one exact revision: send `terms.id` from `GET /legal`. An older revision " +
+    "is refused, because the user has not read what they would be agreeing to. Accepting twice is safe.",
+  tags: TAGS,
+  body: acceptTermsRequestSchema,
+  successResponse: { status: 200, description: "The profile, with `needsTermsAcceptance: false`.", dataRef: profileSchema },
+  extraResponses: {
+    404: errorResponse("No terms with that id — `document_not_found`."),
+    409: errorResponse("Newer terms were published — `terms_version_mismatch`. Reload GET /legal."),
+  },
+});
+
 export const profileRoutePaths = {
   "/me/profile": { get: getProfileSpec, patch: updateProfileSpec },
+  "/me/terms": { post: acceptTermsSpec },
   "/me/warning/ack": { post: acknowledgeWarningSpec },
 };
 
@@ -63,6 +78,7 @@ router.use(requireUser);
 
 router.get("/profile", profileController.getProfile);
 router.patch("/profile", validateBody(updateProfileRequestSchema), profileController.updateProfile);
+router.post("/terms", validateBody(acceptTermsRequestSchema), profileController.acceptTerms);
 router.post("/warning/ack", profileController.acknowledgeWarning);
 
 export default router;

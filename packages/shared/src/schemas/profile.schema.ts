@@ -71,6 +71,9 @@ export const profileSchema = z
         "Same meaning as on sign-in: onboarding is unfinished. Flips to false in the PATCH " +
           "response that sets the last of age, gender and country.",
       ),
+    needsTermsAcceptance: z
+      .boolean()
+      .describe("True when the current terms must be accepted before rolling. Show the terms screen."),
     pendingWarning: pendingWarningSchema.nullable().describe("Null for almost everyone."),
     createdAt: z.string().datetime(),
   })

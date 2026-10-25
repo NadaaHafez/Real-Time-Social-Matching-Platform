@@ -4,6 +4,7 @@ import { authRoutePaths } from "../routes/auth/auth.routes";
 import { chatRoutePaths } from "../routes/chat/chat.routes";
 import { devRoutePaths } from "../routes/dev/dev.routes";
 import { healthRoutePaths } from "../routes/health/health.routes";
+import { legalRoutePaths } from "../routes/legal/legal.routes";
 import { filtersRoutePaths } from "../routes/filters/filters.routes";
 import { matchmakingRoutePaths } from "../routes/matchmaking/matchmaking.routes";
 import { paymentsRoutePaths } from "../routes/payments/payments.routes";
@@ -50,6 +51,7 @@ const errorRef = (description: string) => ({
 const paths = {
   ...healthRoutePaths,
   ...authRoutePaths,
+  ...legalRoutePaths,
   ...profileRoutePaths,
   ...filtersRoutePaths,
   ...rollsRoutePaths,
@@ -71,6 +73,7 @@ export const swaggerSpec = {
   tags: [
     { name: "Health", description: "Liveness and database reachability." },
     { name: "Auth", description: "Pi sign-in, token refresh and sign-out." },
+    { name: "Legal", description: "Terms of use and privacy policy, published as revisions." },
     { name: "Profile", description: "The signed-in user's own profile." },
     { name: "Filters", description: "Who a user wants to match with, and the country slots they own." },
     { name: "Rolls", description: "The in-app currency: balance, history, welcome grant and daily streak." },

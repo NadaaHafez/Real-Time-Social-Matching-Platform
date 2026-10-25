@@ -15,6 +15,7 @@ export * from "./schemas/matchmaking.schema";
 export * from "./schemas/chat.schema";
 export * from "./schemas/moderation.schema";
 export * from "./schemas/admin.schema";
+export * from "./schemas/legal.schema";
 export * from "./schemas/socket.schema";
 
 export * from "./registry";

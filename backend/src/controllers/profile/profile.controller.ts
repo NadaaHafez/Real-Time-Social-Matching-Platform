@@ -1,4 +1,4 @@
-import type { Profile, UpdateProfileRequest } from "@social-matching/shared";
+import type { AcceptTermsRequest, Profile, UpdateProfileRequest } from "@social-matching/shared";
 
 import * as profileService from "../../services/profile/profile.service";
 import { asyncHandler } from "../../utils/asyncHandler";
@@ -18,4 +18,8 @@ export const updateProfile = asyncHandler<Profile, UpdateProfileRequest>(async (
 
 export const acknowledgeWarning = asyncHandler<Profile>(async (req, res) => {
   res.status(200).json(await profileService.acknowledgeWarning(req.currentUser!.id));
+});
+
+export const acceptTerms = asyncHandler<Profile, AcceptTermsRequest>(async (req, res) => {
+  res.status(200).json(await profileService.acceptTerms(req.currentUser!.id, req.body.documentId));
 });

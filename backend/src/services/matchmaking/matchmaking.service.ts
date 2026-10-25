@@ -6,6 +6,7 @@ import { emitToUser, isOnline } from "../../realtime/socket";
 import type { CurrentUser } from "../../types/express";
 import { HttpError } from "../../utils/httpError";
 import { lockSnapshot, rollCostOf } from "../filters/filters.service";
+import { needsTermsAcceptance } from "../legal/legal.service";
 import { blockedPartnersOf } from "../moderation/block.service";
 import * as ledger from "../rolls/ledger.service";
 import { createSession, markOpen, openSessionOf, partnerSummary } from "../sessions/session.service";
@@ -54,6 +55,11 @@ export async function roll(user: CurrentUser): Promise<RollResponse> {
 
     if (!profile?.age || !profile.gender || !profile.country) {
       throw HttpError.badRequest("profile_incomplete", "Finish your profile before rolling.");
+    }
+
+    // Cached, so this costs no query on most rolls.
+    if (await needsTermsAcceptance(user.id)) {
+      throw HttpError.forbidden("terms_not_accepted", "Accept the current terms before rolling.");
     }
 
     const settings = await getSettings();

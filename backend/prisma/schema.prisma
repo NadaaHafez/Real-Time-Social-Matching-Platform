@@ -85,8 +85,55 @@ model User {
   reportsReviewed Report[] @relation("ReportReviewer")
   blocksMade      Block[]  @relation("BlockBlocker")
   blocksAgainst   Block[]  @relation("BlockBlocked")
+  legalPublished  LegalDocument[]
+  legalAccepted   LegalAcceptance[]
 
   @@map("users")
+}
+
+/// Terms are accepted per revision; the privacy policy is only shown.
+enum LegalDocumentType {
+  terms
+  privacy
+}
+
+/// One published revision. Never edited: a change is a new revision, so the exact wording a
+/// user accepted can always be read back.
+model LegalDocument {
+  id   String            @id @default(uuid())
+  type LegalDocumentType
+  /// Previous + 1, assigned by the server. Shown as "v3".
+  revision Int
+
+  title   String
+  /// Markdown.
+  content String @db.Text
+
+  /// Terms only: asks everyone to accept again. A wording fix leaves it false.
+  requiresReaccept Boolean @default(false) @map("requires_reaccept")
+
+  publishedById String?  @map("published_by_id")
+  publishedBy   User?    @relation(fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt   DateTime @default(now()) @map("published_at")
+
+  acceptances LegalAcceptance[]
+
+  /// Two publishes racing for the same number: one wins, the other gets a 409.
+  @@unique([type, revision])
+  @@map("legal_documents")
+}
+
+/// Evidence that a user accepted one exact revision. Append-only.
+model LegalAcceptance {
+  userId     String        @map("user_id")
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String        @map("document_id")
+  document   LegalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+
+  @@id([userId, documentId])
+  @@map("legal_acceptances")
 }
 
 enum ReportReason {
