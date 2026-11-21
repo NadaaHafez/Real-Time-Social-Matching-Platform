@@ -38,7 +38,7 @@ TypeScript · Node.js · Express · Socket.IO · PostgreSQL · Prisma · Zod · 
 
 ## Getting started
 
-Needs Node 20+, Yarn 1 and Docker.
+Needs Node 22+, Yarn 1 and Docker.
 
 ```bash
 yarn install
