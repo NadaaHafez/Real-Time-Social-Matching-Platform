@@ -33,6 +33,8 @@ declare global {
 const AUTH_TIMEOUT_MS = 30_000;
 
 let initialized = false;
+/** Whether authenticate() succeeded on this page. A reload restores our session without it. */
+let authenticated = false;
 
 function sdk(): PiSdk {
   if (!window.Pi) throw new Error("The Pi SDK did not load.");
@@ -59,7 +61,20 @@ export async function authenticateWithPi(onIncompletePayment: (paymentId: string
     setTimeout(() => reject(new Error("No answer from Pi. Open this app in the Pi Browser or the Pi sandbox.")), AUTH_TIMEOUT_MS),
   );
 
-  return Promise.race([result, timeout]);
+  const auth = await Promise.race([result, timeout]);
+  authenticated = true;
+  return auth;
+}
+
+/**
+ * Pi refuses createPayment until authenticate() with "payments" has run on this page. Silent
+ * when the user already granted it. Unfinished payments it reports are settled first.
+ */
+async function ensurePaymentsScope(settle: (paymentId: string) => Promise<unknown>): Promise<void> {
+  if (authenticated) return;
+  const unfinished: string[] = [];
+  await authenticateWithPi((paymentId) => unfinished.push(paymentId));
+  for (const paymentId of unfinished) await settle(paymentId).catch(() => undefined);
 }
 
 /** What our backend does at each step. The amount and owner are checked there, not here. */
@@ -73,10 +88,12 @@ export interface PaymentSteps<Receipt> {
  * Pi's payment flow as one awaitable call: Pi asks us to approve, the user signs in their
  * wallet, then Pi asks us to complete. Resolves with the receipt, or null if the user backed out.
  */
-export function payWithPi<Receipt>(
+export async function payWithPi<Receipt>(
   payment: { amount: number; memo: string; metadata: Record<string, unknown> },
   steps: PaymentSteps<Receipt>,
 ): Promise<Receipt | null> {
+  await ensurePaymentsScope(steps.complete);
+
   return new Promise((resolve, reject) => {
     sdk().createPayment(payment, {
       onReadyForServerApproval: (paymentId) => {
