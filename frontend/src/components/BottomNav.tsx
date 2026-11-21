@@ -8,6 +8,7 @@ const TABS = [
   { href: "/home", label: "Roll", icon: "◉" },
   { href: "/filters", label: "Filters", icon: "⚙" },
   { href: "/shop", label: "Shop", icon: "✦" },
+  { href: "/me", label: "Me", icon: "☺" },
 ];
 
 /** The main screens. Chat and onboarding have none: they are steps, not places. */

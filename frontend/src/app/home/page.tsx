@@ -24,7 +24,7 @@ type Search = { startedAt: number; expiresAt: number | null };
 
 export default function HomePage() {
   const ready = useGuard("app");
-  const { profile, socket, signOut } = useSession();
+  const { profile, socket } = useSession();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -107,14 +107,9 @@ export default function HomePage() {
 
   return (
     <Screen nav>
-      <header className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-zinc-500">Signed in as</p>
-          <p className="font-semibold">@{profile.username}</p>
-        </div>
-        <Button variant="ghost" className="px-2 py-1 text-sm" onClick={() => void signOut()}>
-          Sign out
-        </Button>
+      <header>
+        <p className="text-sm text-zinc-500">Hi,</p>
+        <p className="text-xl font-bold">@{profile.username}</p>
       </header>
 
       <Card className="flex items-end justify-between">
