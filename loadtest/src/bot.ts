@@ -1,5 +1,6 @@
 import type {
   ClientToServerEvents,
+  CurrentChatResponse,
   LegalDocuments,
   RollResponse,
   ServerToClientEvents,
@@ -187,6 +188,8 @@ export class Bot {
   // --------------------------------------------------------------------------
 
   private async rollAndChat(): Promise<void> {
+    // After a dropped connection, wait for socket.io to reconnect, like the app does.
+    if (!this.socket?.connected) await this.reconnected();
     this.state = "rolling";
     const started = performance.now();
     // Listen before rolling: match:found can arrive before the HTTP response does.
@@ -200,6 +203,10 @@ export class Bot {
       this.state = "idle";
       if (error instanceof ApiError && error.code === "insufficient_rolls") {
         await this.call("POST", "/dev/rolls", { amount: ROLLS_TOPUP });
+      }
+      if (error instanceof ApiError && error.code === "already_chatting") {
+        recordError(error.code);
+        return this.resumeChat();
       }
       throw error;
     }
@@ -248,6 +255,23 @@ export class Bot {
     await Promise.race([ended, sleep(10_000)]);
     this.onSessionEnd = undefined;
     this.sessionId = null;
+  }
+
+  /** The server still has us in a chat we lost track of (dropped socket): pick it up, as the app does on reload. */
+  private async resumeChat(): Promise<void> {
+    const { chat } = await this.call<CurrentChatResponse>("GET", "/chat/current");
+    if (!chat) return;
+    this.sessionId = chat.sessionId;
+    this.talkingToHuman = false;
+    this.echoes = [];
+    await this.chat();
+  }
+
+  private reconnected(): Promise<void> {
+    return new Promise((resolve) => {
+      this.socket?.once("connect", () => resolve());
+      setTimeout(resolve, 15_000);
+    });
   }
 
   private async say(sessionId: string, body: string): Promise<void> {
