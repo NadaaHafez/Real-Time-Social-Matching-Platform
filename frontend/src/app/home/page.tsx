@@ -1,6 +1,6 @@
 "use client";
 
-import type { CancelRollResponse, PartnerSummary, RollResponse, RollsBalance } from "@social-matching/shared";
+import type { CancelRollResponse, MatchFilters, PartnerSummary, RollResponse, RollsBalance } from "@social-matching/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
@@ -13,8 +13,9 @@ import { useSession } from "@/components/SessionProvider";
 import { Button, Card, ErrorText, Loading, Screen } from "@/components/ui";
 import { useGuard } from "@/components/useGuard";
 import { api, ApiError, errorMessage } from "@/lib/api";
-import { plural } from "@/lib/format";
-import { keys, useBalance, useCurrentChat, useFilters, useQueue } from "@/lib/queries";
+import { countryFlag, plural } from "@/lib/format";
+import { useClaimStreak } from "@/lib/mutations";
+import { keys, useBalance, useCurrentChat, useFilters, useQueue, useStreak } from "@/lib/queries";
 
 /** How long the match reveal shows before the chat opens. */
 const REVEAL_MS = 1_600;
@@ -107,20 +108,15 @@ export default function HomePage() {
 
   return (
     <Screen nav>
-      <header>
-        <p className="text-sm text-zinc-500">Hi,</p>
-        <p className="text-xl font-bold">@{profile.username}</p>
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-zinc-500">Hi,</p>
+          <p className="text-xl font-bold">@{profile.username}</p>
+        </div>
+        <RollsPill available={available} held={balance.data?.held ?? 0} />
       </header>
 
-      <Card className="flex items-end justify-between">
-        <div>
-          <p className="text-sm text-zinc-500">Your Rolls</p>
-          <motion.p key={available} initial={{ scale: 1.2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-4xl font-black">
-            {available ?? "–"}
-          </motion.p>
-        </div>
-        {!!balance.data?.held && <p className="text-sm text-zinc-500">{balance.data.held} held while searching</p>}
-      </Card>
+      <LiveCount waiting={queue.data?.waiting} hidden={!!search} />
 
       <div className="flex flex-1 flex-col items-center justify-center gap-2">
         <RollOrb
@@ -145,12 +141,10 @@ export default function HomePage() {
           </AnimatePresence>
         </RollOrb>
 
-        {search ? (
+        {search && (
           <Button variant="secondary" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
             Cancel search
           </Button>
-        ) : (
-          <p className="text-sm text-zinc-500">{queue.data ? lookingLabel(queue.data.waiting) : "…"}</p>
         )}
 
         {!search && available !== undefined && rollCost !== undefined && !canAfford && (
@@ -161,6 +155,16 @@ export default function HomePage() {
         {notice && <p className="text-center text-sm text-zinc-400">{notice}</p>}
         <ErrorText>{rollError && errorMessage(roll.error)}</ErrorText>
       </div>
+
+      {/* Hidden while searching: nothing should compete with the countdown. */}
+      <AnimatePresence>
+        {!search && (
+          <motion.div className="flex flex-col gap-3" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}>
+            <StreakNudge />
+            {filters.data && <FiltersSummary filters={filters.data.filters} rollCost={filters.data.rollCost} />}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>{matched && <MatchReveal partner={matched} />}</AnimatePresence>
     </Screen>
@@ -195,4 +199,86 @@ function secondsLeft(search: Search, now: number): string {
 function lookingLabel(waiting: number): string {
   if (waiting === 0) return "Nobody else is looking right now";
   return waiting === 1 ? "1 person is looking right now" : `${waiting} people are looking right now`;
+}
+
+/** The balance, small and always visible. Tapping it opens the shop. */
+function RollsPill({ available, held }: { available: number | undefined; held: number }) {
+  return (
+    <Link href="/shop" className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-2 pr-3.5">
+      <span className="size-5 rounded-full bg-gradient-to-br from-brand to-accent" />
+      <motion.span key={available} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className="font-black tabular-nums">
+        {available ?? "–"}
+      </motion.span>
+      {held > 0 && <span className="text-xs text-zinc-500">+{held} held</span>}
+    </Link>
+  );
+}
+
+/** "3 people are looking right now", with a live dot. */
+function LiveCount({ waiting, hidden }: { waiting: number | undefined; hidden: boolean }) {
+  if (hidden || waiting === undefined) return <div className="h-5" />;
+
+  return (
+    <p className="flex items-center justify-center gap-2 text-sm text-zinc-400">
+      <span className="relative flex size-2">
+        <motion.span
+          className="absolute inline-flex size-full rounded-full bg-emerald-400"
+          animate={{ scale: [1, 2.2], opacity: [0.7, 0] }}
+          transition={{ duration: 1.6, repeat: Infinity }}
+        />
+        <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+      </span>
+      {lookingLabel(waiting)}
+    </p>
+  );
+}
+
+/** Only shown while today's streak Rolls are unclaimed. */
+function StreakNudge() {
+  const streak = useStreak();
+  const claim = useClaimStreak();
+
+  if (!streak.data || streak.data.claimedToday) return null;
+
+  return (
+    <Card className="flex items-center gap-3 border-amber-400/20 py-3">
+      <span className="text-2xl">🔥</span>
+      <p className="flex-1 text-sm">
+        <span className="font-semibold">Day {streak.data.day} streak.</span>{" "}
+        <span className="text-zinc-400">Claim today&apos;s {plural(streak.data.bonusRolls, "Roll")}.</span>
+      </p>
+      <Button className="px-3 py-1.5 text-sm" disabled={claim.isPending} onClick={() => claim.mutate()}>
+        +{streak.data.bonusRolls}
+      </Button>
+    </Card>
+  );
+}
+
+/** What the next roll looks for, and why it costs what it does. */
+function FiltersSummary({ filters, rollCost }: { filters: MatchFilters; rollCost: number }) {
+  const parts: string[] = [];
+  if (filters.age.enabled) parts.push(`${filters.age.min}–${filters.age.max}`);
+  if (filters.gender.enabled && filters.gender.value) parts.push(filters.gender.value);
+
+  const countries = filters.country[filters.country.mode];
+  if (filters.country.enabled && countries.length > 0) {
+    const flags = countries.slice(0, 4).map(countryFlag).join(" ") + (countries.length > 4 ? " …" : "");
+    parts.push(filters.country.mode === "include" ? `${flags} only` : `not ${flags}`);
+  }
+
+  return (
+    <Link href="/filters">
+      <Card className="flex items-center gap-3 py-3 transition-colors hover:border-white/15">
+        <div className="flex-1">
+          <p className="text-xs text-zinc-500">Looking for</p>
+          <p className="font-medium">{parts.length ? parts.join(" · ") : "Anyone. No filters on."}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-zinc-500">Each roll</p>
+          <p className="font-semibold whitespace-nowrap">{plural(rollCost, "Roll")}</p>
+        </div>
+        <span className="text-zinc-600">›</span>
+      </Card>
+    </Link>
+  );
 }

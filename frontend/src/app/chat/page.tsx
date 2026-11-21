@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ReportSheet } from "@/components/chat/ReportSheet";
 import { useSession } from "@/components/SessionProvider";
 import { Button, ErrorText, Input, Loading, Screen } from "@/components/ui";
 import { useGuard } from "@/components/useGuard";
@@ -30,6 +31,8 @@ export default function ChatPage() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [ended, setEnded] = useState<SessionEndedEvent["reason"] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
 
   const bottom = useRef<HTMLDivElement>(null);
   const typingSent = useRef(false);
@@ -131,15 +134,32 @@ export default function ChatPage() {
           </p>
         </div>
         {!ended && (
-          <Button
-            variant="danger"
-            className="px-3 py-2 text-sm"
-            onClick={() => void socket?.emitWithAck("session:leave", { sessionId: chat.sessionId })}
-          >
-            Leave
-          </Button>
+          <div className="flex gap-1">
+            <Button variant="ghost" className="px-2 py-2 text-sm" onClick={() => setReporting(true)}>
+              Report
+            </Button>
+            <Button
+              variant="danger"
+              className="px-3 py-2 text-sm"
+              onClick={() => void socket?.emitWithAck("session:leave", { sessionId: chat.sessionId })}
+            >
+              Leave
+            </Button>
+          </div>
         )}
       </header>
+
+      <ReportSheet
+        sessionId={chat.sessionId}
+        partnerName={partner.displayName}
+        open={reporting && !ended}
+        onClose={() => setReporting(false)}
+        onReported={() => {
+          // The server ends the chat too; `session:ended` follows on the socket.
+          setReported(true);
+          setReporting(false);
+        }}
+      />
 
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
         {messages.length === 0 && !ended && (
@@ -171,9 +191,7 @@ export default function ChatPage() {
 
       {ended ? (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 text-center">
-          <p className="text-zinc-400">
-            {ended === "partner_left" ? `${partner.displayName} left the chat.` : "You left the chat."}
-          </p>
+          <p className="text-zinc-400">{endedMessage(ended, reported, partner.displayName)}</p>
           <Button onClick={rollAgain}>Roll again</Button>
         </motion.div>
       ) : (
@@ -193,6 +211,12 @@ export default function ChatPage() {
       <ErrorText>{error}</ErrorText>
     </Screen>
   );
+}
+
+/** A reported partner is only ever told "left", so the reporter's view is the only one that differs. */
+function endedMessage(reason: SessionEndedEvent["reason"], reported: boolean, partner: string): string {
+  if (reported) return `Thanks for reporting. You won't be matched with ${partner} again for a while.`;
+  return reason === "partner_left" ? `${partner} left the chat.` : "You left the chat.";
 }
 
 function TypingDots() {

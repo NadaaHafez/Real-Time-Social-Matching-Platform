@@ -1,27 +1,17 @@
 "use client";
 
-import type { ClaimStreakResponse } from "@social-matching/shared";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 
 import { Button, Card, ErrorText, Spinner } from "@/components/ui";
-import { api, errorMessage } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { plural } from "@/lib/format";
-import { keys, useStreak } from "@/lib/queries";
+import { useClaimStreak } from "@/lib/mutations";
+import { useStreak } from "@/lib/queries";
 
 /** One claim per UTC day. Missing a day starts again at day 1. */
 export function StreakCard() {
-  const queryClient = useQueryClient();
   const streak = useStreak();
-
-  const claim = useMutation({
-    mutationFn: () => api.post<ClaimStreakResponse>("/rolls/streak/claim"),
-    onSuccess: ({ streak: updated, balance }) => {
-      queryClient.setQueryData(keys.streak, updated);
-      queryClient.setQueryData(keys.balance, balance);
-      void queryClient.invalidateQueries({ queryKey: keys.ledger });
-    },
-  });
+  const claim = useClaimStreak();
 
   const data = streak.data;
 

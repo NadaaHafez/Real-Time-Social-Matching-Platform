@@ -4,7 +4,7 @@ import type { ZodSchema, ZodErrorMap } from "zod";
 /** Zod's defaults are written for developers; these read better on a form. */
 const friendlyErrors: ZodErrorMap = (issue, ctx) => {
   if (issue.code === "invalid_enum_value") return { message: "Choose one" };
-  if (issue.code === "invalid_type" && (issue.received === "undefined" || issue.received === "nan")) {
+  if (issue.code === "invalid_type" && ["undefined", "null", "nan"].includes(issue.received)) {
     return { message: "Required" };
   }
   return { message: ctx.defaultError };
