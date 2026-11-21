@@ -46,7 +46,7 @@ export const resolveReportRequestSchema = z
     note: z.string().trim().max(1000).optional().describe("The moderator's reason, kept on the report."),
   })
   .refine((input) => (input.action === "suspend") === (input.suspendDays !== undefined), {
-    message: "suspendDays goes with action `suspend`, and only with it",
+    message: "Choose how long the suspension lasts",
     path: ["suspendDays"],
   });
 export type ResolveReportRequest = z.infer<typeof resolveReportRequestSchema>;

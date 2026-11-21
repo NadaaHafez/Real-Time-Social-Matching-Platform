@@ -1,7 +1,13 @@
 "use client";
 
 import { motion, type HTMLMotionProps } from "motion/react";
-import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import {
+  forwardRef,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 
 import { BottomNav } from "./BottomNav";
 
@@ -51,10 +57,15 @@ export function Button({
   );
 }
 
-/** A labelled control with the shared schema's message under it. */
-export function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+/**
+ * A labelled control with the shared schema's message under it. `group` is for a set of
+ * buttons: inside a <label>, a click anywhere would also press the first of them.
+ */
+export function Field({ label, error, group = false, children }: { label: string; error?: string; group?: boolean; children: ReactNode }) {
+  const Wrapper = group ? "div" : "label";
+
   return (
-    <label className="flex flex-col gap-1.5">
+    <Wrapper className="flex flex-col gap-1.5" {...(group ? { role: "group", "aria-label": label } : {})}>
       <span className="text-sm font-medium text-zinc-400">{label}</span>
       {children}
       {error && (
@@ -62,7 +73,7 @@ export function Field({ label, error, children }: { label: string; error?: strin
           {error}
         </motion.span>
       )}
-    </label>
+    </Wrapper>
   );
 }
 
@@ -73,6 +84,12 @@ const controlClass =
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className = "", ...props }, ref) {
     return <input ref={ref} className={`${controlClass} ${className}`} {...props} />;
+  },
+);
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  function Textarea({ className = "", ...props }, ref) {
+    return <textarea ref={ref} className={`${controlClass} ${className}`} {...props} />;
   },
 );
 

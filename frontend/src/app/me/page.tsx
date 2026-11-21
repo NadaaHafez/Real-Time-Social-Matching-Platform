@@ -8,13 +8,16 @@ import { StreakCard } from "@/components/me/StreakCard";
 import { WalletCard } from "@/components/me/WalletCard";
 import { WarningBanner } from "@/components/me/WarningBanner";
 import { useSession } from "@/components/SessionProvider";
-import { Button, Loading, Screen } from "@/components/ui";
+import { Button, Card, Loading, Screen } from "@/components/ui";
 import { useGuard } from "@/components/useGuard";
+import { useAdminRole } from "@/lib/adminQueries";
 import { countryFlag, countryName } from "@/lib/format";
 
 export default function MePage() {
   const ready = useGuard("app");
   const { profile, signOut } = useSession();
+  // Null for everyone but moderators and owners, so the link stays hidden.
+  const adminRole = useAdminRole(ready);
 
   if (!ready || !profile) return <Loading />;
 
@@ -35,6 +38,17 @@ export default function MePage() {
       <AnimatePresence>
         {profile.pendingWarning && <WarningBanner key="warning" message={profile.pendingWarning.message} />}
       </AnimatePresence>
+
+      {adminRole.data && (
+        <Link href="/admin">
+          <Card className="flex items-center gap-3 border-accent/30 py-4 transition-colors hover:border-accent/60">
+            <span className="text-xl">🛡️</span>
+            <p className="flex-1 font-semibold">Admin</p>
+            <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs text-accent">{adminRole.data}</span>
+            <span className="text-zinc-600">›</span>
+          </Card>
+        </Link>
+      )}
 
       <StreakCard />
       <WalletCard />

@@ -1,22 +1,15 @@
 "use client";
 
-import { reportReasonSchema, reportRequestSchema, type ReportReason } from "@social-matching/shared";
+import { reportReasonSchema, reportRequestSchema } from "@social-matching/shared";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 
 import { Sheet } from "@/components/Sheet";
-import { Button, ErrorText, Field, Spinner } from "@/components/ui";
+import { Button, ErrorText, Field, Spinner, Textarea } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api";
+import { REPORT_REASONS } from "@/lib/format";
 import { sharedResolver } from "@/lib/forms";
-
-const REASONS: Record<ReportReason, string> = {
-  harassment: "Harassment or hate",
-  sexual_content: "Sexual content",
-  scam_or_spam: "Scam or spam",
-  underage: "Seems underage",
-  other: "Something else",
-};
 
 /** The request minus the session, which this sheet already knows. */
 const formSchema = reportRequestSchema.omit({ sessionId: true });
@@ -65,16 +58,15 @@ export function ReportSheet({
               }`}
             >
               <input type="radio" value={reason} className="accent-[var(--color-brand)]" {...register("reason")} />
-              {REASONS[reason]}
+              {REPORT_REASONS[reason]}
             </label>
           ))}
           {errors.reason && <p className="text-sm text-red-400">{errors.reason.message}</p>}
         </div>
 
         <Field label="Anything else? (optional)" error={errors.note?.message}>
-          <textarea
+          <Textarea
             rows={3}
-            className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-base text-zinc-100 outline-none focus:border-brand focus:ring-4 focus:ring-brand/20"
             {...register("note", { setValueAs: (value: string) => (value.trim() === "" ? undefined : value) })}
           />
         </Field>

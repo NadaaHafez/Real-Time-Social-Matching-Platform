@@ -86,18 +86,33 @@ export default function HomePage() {
     },
   });
 
+  // Optimistic: the search stops on screen at once, and the server confirms in the background.
   const cancel = useMutation({
     mutationFn: () => api.post<CancelRollResponse>("/matchmaking/cancel"),
+    onMutate: () => {
+      const previous = search;
+      setSearch(null);
+      setNotice("Search cancelled.");
+      return { previous };
+    },
     onSuccess: (result) => {
       setBalance(result.balance);
-      setSearch(null);
       setNotice("Search cancelled. Your Rolls were refunded.");
     },
-    onError: (err) => {
-      // Matched a moment before: `match:found` is on its way. Nothing to cancel: stop showing it.
-      if (err instanceof ApiError && err.code === "not_rolling") setSearch(null);
+    onError: (err, _vars, context) => {
+      // Nothing to cancel: it was already gone. Matched a moment before: `match:found` is on its way.
+      if (err instanceof ApiError && (err.code === "not_rolling" || err.code === "already_matched")) {
+        setNotice(null);
+        return;
+      }
+      // Anything else: the search is still running, so show it again.
+      setSearch(context?.previous ?? null);
+      setNotice(null);
     },
   });
+
+  const cancelError =
+    cancel.error && !(cancel.error instanceof ApiError && ["not_rolling", "already_matched"].includes(cancel.error.code));
 
   if (!ready || !profile) return <Loading />;
 
@@ -122,7 +137,7 @@ export default function HomePage() {
         <RollOrb
           searching={!!search}
           progress={search ? progressOf(search, now) : null}
-          disabled={!search && (roll.isPending || !socket || !canAfford)}
+          disabled={!search && (roll.isPending || cancel.isPending || !socket || !canAfford)}
           onClick={() => (search ? undefined : roll.mutate())}
         >
           <AnimatePresence mode="wait">
@@ -142,7 +157,7 @@ export default function HomePage() {
         </RollOrb>
 
         {search && (
-          <Button variant="secondary" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+          <Button variant="secondary" onClick={() => cancel.mutate()}>
             Cancel search
           </Button>
         )}
@@ -154,6 +169,7 @@ export default function HomePage() {
         )}
         {notice && <p className="text-center text-sm text-zinc-400">{notice}</p>}
         <ErrorText>{rollError && errorMessage(roll.error)}</ErrorText>
+        <ErrorText>{cancelError && errorMessage(cancel.error)}</ErrorText>
       </div>
 
       {/* Hidden while searching: nothing should compete with the countdown. */}
