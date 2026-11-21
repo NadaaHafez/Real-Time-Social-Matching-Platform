@@ -3,6 +3,7 @@
 import type { CancelRollResponse, PartnerSummary, RollResponse, RollsBalance } from "@social-matching/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -105,7 +106,7 @@ export default function HomePage() {
   const rollError = roll.error && !(roll.error instanceof ApiError && roll.error.code === "already_rolling");
 
   return (
-    <Screen>
+    <Screen nav>
       <header className="flex items-center justify-between">
         <div>
           <p className="text-sm text-zinc-500">Signed in as</p>
@@ -158,7 +159,9 @@ export default function HomePage() {
         )}
 
         {!search && available !== undefined && rollCost !== undefined && !canAfford && (
-          <p className="text-sm text-zinc-500">Not enough Rolls. The shop is coming soon.</p>
+          <Link href="/shop" className="text-sm text-accent underline-offset-4 hover:underline">
+            Not enough Rolls. Get more in the shop →
+          </Link>
         )}
         {notice && <p className="text-center text-sm text-zinc-400">{notice}</p>}
         <ErrorText>{rollError && errorMessage(roll.error)}</ErrorText>

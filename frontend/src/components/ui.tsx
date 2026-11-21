@@ -3,17 +3,22 @@
 import { motion, type HTMLMotionProps } from "motion/react";
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 
-/** Phone-width column, faded in: the Pi Browser is a phone. */
-export function Screen({ children }: { children: ReactNode }) {
+import { BottomNav } from "./BottomNav";
+
+/** Phone-width column, faded in: the Pi Browser is a phone. `nav` adds the bottom tabs. */
+export function Screen({ children, nav = false }: { children: ReactNode; nav?: boolean }) {
   return (
-    <motion.main
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-4 py-6"
-    >
-      {children}
-    </motion.main>
+    <>
+      <motion.main
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className={`mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-4 pt-6 ${nav ? "pb-28" : "pb-6"}`}
+      >
+        {children}
+      </motion.main>
+      {nav && <BottomNav />}
+    </>
   );
 }
 

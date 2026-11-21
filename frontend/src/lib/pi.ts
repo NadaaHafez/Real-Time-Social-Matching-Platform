@@ -7,12 +7,20 @@ export interface PiPaymentDTO {
   identifier: string;
 }
 
+interface PaymentCallbacks {
+  onReadyForServerApproval(paymentId: string): void;
+  onReadyForServerCompletion(paymentId: string, txid: string): void;
+  onCancel(paymentId: string): void;
+  onError(error: Error, payment?: PiPaymentDTO): void;
+}
+
 interface PiSdk {
   init(options: { version: string; sandbox?: boolean }): void;
   authenticate(
     scopes: string[],
     onIncompletePaymentFound: (payment: PiPaymentDTO) => void,
   ): Promise<PiAuthResult>;
+  createPayment(data: { amount: number; memo: string; metadata: Record<string, unknown> }, callbacks: PaymentCallbacks): void;
 }
 
 declare global {
@@ -52,4 +60,37 @@ export async function authenticateWithPi(onIncompletePayment: (paymentId: string
   );
 
   return Promise.race([result, timeout]);
+}
+
+/** What our backend does at each step. The amount and owner are checked there, not here. */
+export interface PaymentSteps<Receipt> {
+  approve(paymentId: string): Promise<unknown>;
+  complete(paymentId: string): Promise<Receipt>;
+  cancel(paymentId: string): Promise<unknown>;
+}
+
+/**
+ * Pi's payment flow as one awaitable call: Pi asks us to approve, the user signs in their
+ * wallet, then Pi asks us to complete. Resolves with the receipt, or null if the user backed out.
+ */
+export function payWithPi<Receipt>(
+  payment: { amount: number; memo: string; metadata: Record<string, unknown> },
+  steps: PaymentSteps<Receipt>,
+): Promise<Receipt | null> {
+  return new Promise((resolve, reject) => {
+    sdk().createPayment(payment, {
+      onReadyForServerApproval: (paymentId) => {
+        steps.approve(paymentId).catch(reject);
+      },
+      onReadyForServerCompletion: (paymentId) => {
+        // The backend reads the txid from Pi itself, so it is not passed on.
+        steps.complete(paymentId).then(resolve, reject);
+      },
+      onCancel: (paymentId) => {
+        void steps.cancel(paymentId).catch(() => undefined);
+        resolve(null);
+      },
+      onError: (error) => reject(error),
+    });
+  });
 }

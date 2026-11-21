@@ -4,6 +4,7 @@ import type {
   LegalDocuments,
   Profile,
   QueueStats,
+  RollPack,
   RollsBalance,
 } from "@social-matching/shared";
 import { QueryClient, useQuery } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ export const keys = {
   queue: ["matchmaking", "queue"],
   currentChat: ["chat", "current"],
   legal: ["legal"],
+  packs: ["payments", "packs"],
 } as const;
 
 export function createQueryClient(): QueryClient {
@@ -57,6 +59,9 @@ export const useCurrentChat = (enabled = true) =>
     queryFn: () => api.get<CurrentChatResponse>("/chat/current"),
     staleTime: 0,
   });
+
+export const usePacks = (enabled = true) =>
+  useQuery({ queryKey: keys.packs, queryFn: () => api.get<RollPack[]>("/payments/packs"), enabled });
 
 export const useLegal = (enabled = true) =>
   useQuery({ queryKey: keys.legal, queryFn: () => api.get<LegalDocuments>("/legal"), enabled });
