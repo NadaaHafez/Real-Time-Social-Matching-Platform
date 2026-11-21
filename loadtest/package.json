@@ -1,0 +1,19 @@
+{
+  "name": "@social-matching/loadtest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bots that use the app like real people, over HTTP and Socket.IO, from outside the backend.",
+  "scripts": {
+    "start": "ts-node --transpile-only src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@social-matching/shared": "0.1.0",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}

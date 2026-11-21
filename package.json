@@ -6,6 +6,7 @@
   "workspaces": [
     "backend",
     "frontend",
+    "loadtest",
     "packages/*"
   ],
   "scripts": {
@@ -17,7 +18,8 @@
     "demo:match": "yarn workspace @social-matching/backend demo:match",
     "typecheck": "yarn build:shared && yarn workspaces run typecheck",
     "dev:frontend": "yarn build:shared && yarn workspace @social-matching/frontend dev",
-    "build:frontend": "yarn build:shared && yarn workspace @social-matching/frontend build"
+    "build:frontend": "yarn build:shared && yarn workspace @social-matching/frontend build",
+    "loadtest": "yarn workspace @social-matching/loadtest start"
   },
   "//": "One copy of the Express types. @types/swagger-ui-express otherwise nests @types/express v5 next to our v4, and the two are nominally different types.",
   "resolutions": {

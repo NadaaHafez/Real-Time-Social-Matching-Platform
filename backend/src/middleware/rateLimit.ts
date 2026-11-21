@@ -1,5 +1,6 @@
 import { rateLimit } from "express-rate-limit";
 
+import env from "../config/env";
 import logger from "../config/logger";
 import { HttpError } from "../utils/httpError";
 
@@ -23,7 +24,8 @@ const AUTH = { windowMs: 15 * 60 * 1000, limit: 20 };
 const SKIPPED_PREFIXES = ["/health", "/api-docs", "/docs"];
 
 const isSkipped = (path: string) =>
-  SKIPPED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+  // A load test sends every bot from one IP, so per-IP limits would only measure themselves.
+  env.loadTest || SKIPPED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 
 // Rejections go through next() so errorHandler writes the `{ error, message }` body,
 // instead of express-rate-limit's plain text.
@@ -42,6 +44,7 @@ export const authLimiter = rateLimit({
   ...AUTH,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => env.loadTest,
   handler: (req, _res, next) => {
     logger.warn("Rate limit exceeded", { limiter: "auth", ip: req.ip, path: req.originalUrl });
     next(

@@ -1,15 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { signInResponseSchema } from "@social-matching/shared";
+import { rollsBalanceSchema, signInResponseSchema } from "@social-matching/shared";
 
 import * as devController from "../../controllers/dev/dev.controller";
 import { buildRouteSpec, registerLocalSchema } from "../../docs/defineRoute";
+import { requireUser } from "../../middleware/auth";
 import { validateBody } from "../../middleware/validation";
 
 /**
- * Developer tools. app.ts mounts this only outside production, which is why nothing here
- * needs auth.
+ * Developer tools. app.ts mounts this only in development, on a demo, or during a load test
+ * (see env.devToolsEnabled), which is why sign-in and cleanup need no auth.
  */
 
 const router = Router();
@@ -42,8 +43,34 @@ const devSignInSpec = buildRouteSpec({
   errors: ["validation", "internal"],
 });
 
+const grantRollsRequestSchema = registerLocalSchema(
+  "GrantRollsRequest",
+  z.object({ amount: z.number().int().min(1).max(100_000) }),
+);
+export type GrantRollsRequest = z.infer<typeof grantRollsRequestSchema>;
+
+const grantRollsSpec = buildRouteSpec({
+  summary: "Give yourself Rolls (development and load tests)",
+  description: "A `bonus` ledger entry, like any other grant, so the ledger stays balanced.",
+  tags: ["Dev"],
+  body: grantRollsRequestSchema,
+  successResponse: { status: 200, description: "The new balance.", dataRef: rollsBalanceSchema },
+  errors: ["validation", "unauthorized", "internal"],
+});
+
+const deleteBotsSpec = buildRouteSpec({
+  summary: "Delete every load-test bot",
+  description: "Hard-deletes the `bot_…` accounts and everything they made. Run it after a load test, not during one.",
+  tags: ["Dev"],
+  public: true,
+  successResponse: { status: 200, description: "How many were deleted." },
+  errors: ["internal"],
+});
+
 export const devRoutePaths = {
   "/dev/signin": { post: devSignInSpec },
+  "/dev/rolls": { post: grantRollsSpec },
+  "/dev/bots": { delete: deleteBotsSpec },
 };
 
 // ============================================================================
@@ -51,5 +78,7 @@ export const devRoutePaths = {
 // ============================================================================
 
 router.post("/signin", validateBody(devSignInRequestSchema), devController.signIn);
+router.post("/rolls", requireUser, validateBody(grantRollsRequestSchema), devController.grantRolls);
+router.delete("/bots", devController.deleteBots);
 
 export default router;

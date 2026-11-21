@@ -39,6 +39,9 @@ const schema = z.object({
 
   /** A public demo: keeps the /dev routes (sign in as anyone) in production. Never on a real deployment. */
   DEMO_MODE: z.enum(["true", "false"]).default("false"),
+
+  /** While a load test runs: the /dev routes, and no per-IP limits (every bot shares one IP). */
+  LOADTEST: z.enum(["true", "false"]).default("false"),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -52,13 +55,15 @@ const raw = parsed.data;
 
 const isProduction = raw.NODE_ENV === "production";
 const demoMode = raw.DEMO_MODE === "true";
+const loadTest = raw.LOADTEST === "true";
 
 const env = {
   nodeEnv: raw.NODE_ENV,
   isProduction,
   demoMode,
-  /** The /dev routes: always in development, in production only on a demo. */
-  devToolsEnabled: !isProduction || demoMode,
+  loadTest,
+  /** The /dev routes: always in development; in production only on a demo or during a load test. */
+  devToolsEnabled: !isProduction || demoMode || loadTest,
   port: raw.PORT,
   databaseUrl: raw.DATABASE_URL,
   piApiKey: raw.PI_API_KEY,
