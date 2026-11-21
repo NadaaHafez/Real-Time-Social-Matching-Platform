@@ -2,9 +2,10 @@
   "name": "real-time-social-matching-platform",
   "private": true,
   "version": "0.1.0",
-  "description": "Random 1-on-1 text chat inside the Pi Browser, funded by Pi. Backend + shared contract.",
+  "description": "Random 1-on-1 text chat inside the Pi Browser, funded by Pi. Backend, frontend and shared contract.",
   "workspaces": [
     "backend",
+    "frontend",
     "packages/*"
   ],
   "scripts": {
@@ -14,7 +15,9 @@
     "prisma:generate": "yarn workspace @social-matching/backend prisma:generate",
     "db:migrate": "yarn workspace @social-matching/backend prisma migrate deploy",
     "demo:match": "yarn workspace @social-matching/backend demo:match",
-    "typecheck": "yarn build:shared && yarn workspaces run typecheck"
+    "typecheck": "yarn build:shared && yarn workspaces run typecheck",
+    "dev:frontend": "yarn build:shared && yarn workspace @social-matching/frontend dev",
+    "build:frontend": "yarn build:shared && yarn workspace @social-matching/frontend build"
   },
   "//": "One copy of the Express types. @types/swagger-ui-express otherwise nests @types/express v5 next to our v4, and the two are nominally different types.",
   "resolutions": {
