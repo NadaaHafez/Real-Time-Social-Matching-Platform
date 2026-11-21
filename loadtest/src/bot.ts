@@ -24,8 +24,20 @@ type MatchOutcome = "matched" | "expired" | "stopped";
 
 const GENDERS = ["male", "female", "other"] as const;
 const COUNTRIES = ["EG", "US", "GB", "DE", "FR", "IN", "BR", "NG", "PK", "SA"];
-const LINES = ["hey", "hi! where are you from?", "nice", "haha same", "what do you do?", "cool", "gotta go, bye"];
+/** What bots say to each other. A message that isn't one of these came from a person. */
+const LINES = ["hey", "hi! where are you from?", "nice", "haha same", "what do you do?", "cool"];
+const REPLIES = [
+  "hi! I'm a load-test bot 🤖",
+  "haha nice",
+  "tell me more",
+  "where are you from?",
+  "same here",
+  "that's cool",
+  "how's your day going?",
+];
 const ROLLS_TOPUP = 10_000;
+/** A person who stays quiet this long is left, like a real user would. */
+const HUMAN_IDLE_MS = 60_000;
 
 const random = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 const pick = <T>(list: readonly T[]) => list[random(0, list.length - 1)];
@@ -37,6 +49,10 @@ export class Bot {
   private stopping = false;
   private socket?: Socket<ServerToClientEvents, ClientToServerEvents>;
   private sessionId: string | null = null;
+  private talkingToHuman = false;
+  private lastHeardAt = 0;
+  /** Send times of our messages whose own copy hasn't come back yet. */
+  private echoes: number[] = [];
   // Resolvers for the socket event a step is waiting on.
   private onMatch?: (outcome: MatchOutcome) => void;
   private onSessionEnd?: () => void;
@@ -124,6 +140,8 @@ export class Bot {
 
     socket.on("match:found", (event) => {
       this.sessionId = event.sessionId;
+      this.talkingToHuman = false;
+      this.echoes = [];
       this.onMatch?.("matched");
     });
     socket.on("match:ended", () => this.onMatch?.("expired"));
@@ -134,11 +152,19 @@ export class Bot {
       this.onSessionEnd?.();
     });
     socket.on("chat:message", (message) => {
-      if (message.author !== "partner") return;
+      if (message.sessionId !== this.sessionId) return;
+      if (message.author === "me") {
+        // Our copy comes in the same broadcast the partner gets, so this is send → delivered.
+        const sentAt = this.echoes.shift();
+        if (sentAt) record("socket message delivery", performance.now() - sentAt);
+        return;
+      }
       counters.messagesReceived++;
-      // Bodies start with the send time. All bots share this clock, so the gap is real delivery time.
-      const sentAt = Number(message.body.split(" ", 1)[0]);
-      if (sentAt) record("socket message delivery", Date.now() - sentAt);
+      if (!LINES.includes(message.body)) {
+        this.talkingToHuman = true;
+        this.lastHeardAt = Date.now();
+        void this.reply(message.sessionId);
+      }
     });
     socket.on("disconnect", (reason) => {
       if (this.state === "stopped") return;
@@ -204,13 +230,16 @@ export class Bot {
     const stillHere = () => this.sessionId === sessionId && !this.stopping;
 
     const messages = random(2, 6);
-    for (let i = 0; i < messages && stillHere(); i++) {
+    for (let i = 0; i < messages && stillHere() && !this.talkingToHuman; i++) {
       await Promise.race([this.pause(1_500, 5_000), ended]);
-      if (!stillHere()) break;
+      if (!stillHere() || this.talkingToHuman) break;
       this.socket?.emit("chat:typing", { sessionId, typing: true });
-      if (await this.emit("chat:message", { sessionId, body: `${Date.now()} ${pick(LINES)}` })) {
-        counters.messagesSent++;
-      }
+      await this.say(sessionId, pick(LINES));
+    }
+
+    // A person: the message handler answers them; stay until they go quiet.
+    while (this.talkingToHuman && stillHere() && Date.now() - this.lastHeardAt < HUMAN_IDLE_MS) {
+      await Promise.race([ended, sleep(1_000)]);
     }
 
     // Done talking: leave, unless the partner already did.
@@ -219,6 +248,20 @@ export class Bot {
     await Promise.race([ended, sleep(10_000)]);
     this.onSessionEnd = undefined;
     this.sessionId = null;
+  }
+
+  private async say(sessionId: string, body: string): Promise<void> {
+    const sentAt = performance.now();
+    this.echoes.push(sentAt);
+    if (await this.emit("chat:message", { sessionId, body })) counters.messagesSent++;
+    else this.echoes.splice(this.echoes.indexOf(sentAt), 1);
+  }
+
+  /** Answers a person: typing, a pause to "read", then a reply. */
+  private async reply(sessionId: string): Promise<void> {
+    this.socket?.emit("chat:typing", { sessionId, typing: true });
+    await this.pause(1_500, 4_000);
+    if (this.sessionId === sessionId) await this.say(sessionId, pick(REPLIES));
   }
 
   /** Emits with an ack, timed. Failed acks are recorded by error code. */
