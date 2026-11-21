@@ -55,12 +55,12 @@ export default function ShopPage() {
 
   return (
     <Screen nav>
-      <header className="flex items-end justify-between">
+      <header className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Shop</h1>
           <p className="text-zinc-500">Rolls are spent each time you roll.</p>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 whitespace-nowrap text-right">
           <p className="text-sm text-zinc-500">You have</p>
           <p className="text-2xl font-black">{balance.data?.available ?? "–"}</p>
         </div>

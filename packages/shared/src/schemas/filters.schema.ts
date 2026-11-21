@@ -39,7 +39,7 @@ export type MatchFilters = z.infer<typeof matchFiltersSchema>;
 
 export const updateFiltersRequestSchema = matchFiltersSchema
   .refine((filters) => filters.age.min <= filters.age.max, {
-    message: "age.min must not be greater than age.max",
+    message: "Must not be higher than the max age",
     path: ["age", "min"],
   })
   .describe("A full replacement: every field is required.");

@@ -102,3 +102,59 @@ export function Loading() {
     </main>
   );
 }
+
+/** An on/off switch. The knob springs across. */
+export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (on: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors ${
+        checked ? "justify-end bg-brand" : "justify-start bg-white/10"
+      }`}
+    >
+      <motion.span layout transition={{ type: "spring", stiffness: 600, damping: 32 }} className="size-5 rounded-full bg-white shadow" />
+    </button>
+  );
+}
+
+/** One choice out of a few. `id` keeps two controls' highlights from jumping between them. */
+export function Segmented<T extends string>({
+  id,
+  options,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  id: string;
+  options: { value: T; label: string }[];
+  value: T | null;
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={`flex gap-1 rounded-2xl bg-black/30 p-1 ${disabled ? "opacity-40" : ""}`}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(option.value)}
+          className="relative flex-1 rounded-xl px-3 py-2 text-sm font-medium"
+        >
+          {value === option.value && (
+            <motion.span
+              layoutId={`segmented-${id}`}
+              className="absolute inset-0 rounded-xl bg-white/10"
+              transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            />
+          )}
+          <span className={`relative ${value === option.value ? "text-zinc-100" : "text-zinc-500"}`}>{option.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
