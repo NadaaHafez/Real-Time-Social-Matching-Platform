@@ -1,10 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #6d28d9;
-  --color-brand-dark: #5b21b6;
+  --color-brand: #8b5cf6;
+  --color-brand-deep: #6d28d9;
+  --color-accent: #f472b6;
+  --color-surface: #16141f;
+  --color-canvas: #0b0a10;
 }
 
 body {
-  @apply bg-zinc-950 text-zinc-100 antialiased;
+  @apply bg-canvas text-zinc-100 antialiased;
+  /* A soft glow behind everything, so the dark isn't flat. */
+  background-image: radial-gradient(60rem 40rem at 50% -10%, rgb(139 92 246 / 0.18), transparent 70%);
+  background-attachment: fixed;
 }

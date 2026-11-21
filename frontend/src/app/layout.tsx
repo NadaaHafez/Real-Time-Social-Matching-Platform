@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import type { ReactNode } from "react";
 
-import { SessionProvider } from "@/components/SessionProvider";
+import { Providers } from "@/components/Providers";
 
 import "./globals.css";
 
@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         {/* Loaded before the app starts, so window.Pi exists when sign-in runs. */}
         <Script src="https://sdk.minepi.com/pi-sdk.js" strategy="beforeInteractive" />
-        <SessionProvider>{children}</SessionProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

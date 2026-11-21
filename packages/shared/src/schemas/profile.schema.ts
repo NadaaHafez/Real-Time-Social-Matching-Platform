@@ -8,32 +8,40 @@ import { countryCodeSchema } from "./common.schema";
 // ============================================================================
 
 /**
- * Zod checks shape; the service checks policy. The minimum age lives in Settings and an
- * admin can change it, so the bounds here are only sanity limits.
+ * Every editable profile field, with its rules. The requests below are built from it, and
+ * clients build their forms from it, so a rule is written once.
  *
- * Age, gender and country can be changed but not cleared, so a finished onboarding cannot
- * be undone. Only `iceBreaker` takes `null`.
+ * Zod checks shape; the service checks policy. The minimum age lives in Settings and an
+ * admin can change it, so the age bounds here are only sanity limits.
  */
-export const updateProfileRequestSchema = z
-  .object({
-    age: z
-      .number()
-      .int()
-      .min(13)
-      .max(120)
-      .optional()
-      .describe("Sanity bounds only. Below Settings.minimumAge returns 400 `below_minimum_age`."),
-    gender: genderSchema.optional(),
-    country: countryCodeSchema.optional(),
-    iceBreaker: z
-      .string()
-      .trim()
-      .min(1, "Send null to clear the ice breaker")
-      .max(200)
-      .nullable()
-      .optional()
-      .describe("Send `null` to clear it. Capped so it stays an opening line, not a wall of text."),
-  })
+export const profileFieldsSchema = z.object({
+  age: z
+    .number({ invalid_type_error: "Enter your age" })
+    .int("Whole years only")
+    .min(13, "Too young")
+    .max(120, "Check your age")
+    .describe("Sanity bounds only. Below Settings.minimumAge returns 400 `below_minimum_age`."),
+  gender: genderSchema,
+  country: countryCodeSchema,
+  iceBreaker: z
+    .string()
+    .trim()
+    .min(1, "Send null to clear the ice breaker")
+    .max(200, "Keep it under 200 characters")
+    .nullable()
+    .describe("Send `null` to clear it. Capped so it stays an opening line, not a wall of text."),
+});
+
+/** The first-time profile: age, gender and country, all required. */
+export const onboardingRequestSchema = profileFieldsSchema.pick({ age: true, gender: true, country: true });
+export type OnboardingRequest = z.infer<typeof onboardingRequestSchema>;
+
+/**
+ * A partial update. Age, gender and country can be changed but not cleared, so a finished
+ * onboarding cannot be undone. Only `iceBreaker` takes `null`.
+ */
+export const updateProfileRequestSchema = profileFieldsSchema
+  .partial()
   .refine((patch) => Object.keys(patch).length > 0, { message: "Provide at least one field to update" })
   .describe("A partial update: send only the fields that changed, but at least one.");
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;

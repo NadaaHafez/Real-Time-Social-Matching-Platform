@@ -3,16 +3,21 @@
 import {
   COUNTRIES,
   genderSchema,
-  type Gender,
-  type LegalDocuments,
+  onboardingRequestSchema,
+  type OnboardingRequest,
   type Profile,
 } from "@social-matching/shared";
-import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { useSession } from "@/components/SessionProvider";
-import { Button, Card, ErrorText, Field, inputClass, Loading, Screen } from "@/components/ui";
+import { Button, Card, ErrorText, Field, Input, Loading, Screen, Select, Spinner } from "@/components/ui";
 import { useGuard } from "@/components/useGuard";
 import { api, errorMessage } from "@/lib/api";
+import { sharedResolver } from "@/lib/forms";
+import { useLegal } from "@/lib/queries";
 
 const SORTED_COUNTRIES = [...COUNTRIES].sort((a, b) => a.label.localeCompare(b.label));
 
@@ -20,11 +25,11 @@ export default function OnboardingPage() {
   const ready = useGuard("onboarding");
   const { profile, setProfile } = useSession();
 
-  // The newest profile from the server, kept here until onboarding is done.
+  // Between the two steps, the newest profile stays here, so the guard does not move on early.
   const [draft, setDraft] = useState<Profile | null>(null);
   const current = draft ?? profile;
 
-  /** The welcome Rolls, then hand the finished profile to the session, which moves on to /home. */
+  /** The welcome Rolls, then the finished profile to the session, which moves on to /home. */
   async function finish(finished: Profile) {
     await api.post("/rolls/welcome").catch(() => undefined);
     setProfile(finished);
@@ -37,109 +42,116 @@ export default function OnboardingPage() {
 
   if (!ready || !current) return <Loading />;
 
+  const step = current.isNewUser ? "profile" : "terms";
+
   return (
     <Screen>
-      <h1 className="text-2xl font-bold">Welcome, @{current.username}</h1>
-      {current.isNewUser ? <ProfileStep onSaved={afterProfile} /> : <TermsStep onAccepted={finish} />}
+      <header className="flex flex-col gap-1">
+        <h1 className="text-3xl font-bold">
+          {step === "profile" ? `Hi, @${current.username}` : "One last thing"}
+        </h1>
+      </header>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={step}
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -24 }}
+          transition={{ duration: 0.2 }}
+        >
+          {step === "profile" ? <ProfileStep onSaved={afterProfile} /> : <TermsStep onAccepted={finish} />}
+        </motion.div>
+      </AnimatePresence>
     </Screen>
   );
 }
 
+/** Validated by the same schema the backend checks the request with. */
 function ProfileStep({ onSaved }: { onSaved: (profile: Profile) => Promise<void> }) {
-  const [age, setAge] = useState("");
-  const [gender, setGender] = useState<Gender | "">("");
-  const [country, setCountry] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<OnboardingRequest>({ resolver: sharedResolver(onboardingRequestSchema) });
 
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      await onSaved(await api.patch<Profile>("/me/profile", { age: Number(age), gender, country }));
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  }
+  const save = useMutation({
+    mutationFn: (values: OnboardingRequest) => api.patch<Profile>("/me/profile", values),
+    onSuccess: onSaved,
+  });
 
   return (
     <Card>
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void save();
-        }}
-      >
-        <p className="text-zinc-400">Matches use these, and so do other people&apos;s filters.</p>
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit((values) => save.mutate(values))} noValidate>
+        <p className="text-zinc-400">Matching uses these, and so do other people&apos;s filters.</p>
 
-        <Field label="Age">
-          <input className={inputClass} type="number" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
+        <Field label="Age" error={errors.age?.message}>
+          <Input
+            type="number"
+            inputMode="numeric"
+            aria-invalid={!!errors.age}
+            {...register("age", { valueAsNumber: true })}
+          />
         </Field>
 
-        <Field label="Gender">
-          <select className={inputClass} value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
-            <option value="">Choose…</option>
+        <Field label="Gender" error={errors.gender?.message}>
+          <Select aria-invalid={!!errors.gender} defaultValue="" {...register("gender")}>
+            <option value="" disabled>
+              Choose…
+            </option>
             {genderSchema.options.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
 
-        <Field label="Country">
-          <select className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)}>
-            <option value="">Choose…</option>
+        <Field label="Country" error={errors.country?.message}>
+          <Select aria-invalid={!!errors.country} defaultValue="" {...register("country")}>
+            <option value="" disabled>
+              Choose…
+            </option>
             {SORTED_COUNTRIES.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.label}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
 
-        <Button disabled={busy || !age || !gender || !country}>{busy ? "Saving…" : "Continue"}</Button>
-        <ErrorText>{error}</ErrorText>
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? <Spinner /> : "Continue"}
+        </Button>
+        {/* Rules only the server knows, like the minimum age in Settings. */}
+        <ErrorText>{save.error && errorMessage(save.error)}</ErrorText>
       </form>
     </Card>
   );
 }
 
 function TermsStep({ onAccepted }: { onAccepted: (profile: Profile) => Promise<void> }) {
-  const [documents, setDocuments] = useState<LegalDocuments | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const legal = useLegal();
+  const terms = legal.data?.terms;
 
-  useEffect(() => {
-    api.get<LegalDocuments>("/legal").then(setDocuments, (err) => setError(errorMessage(err)));
-  }, []);
-
-  async function accept(documentId: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      await onAccepted(await api.post<Profile>("/me/terms", { documentId }));
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  }
-
-  const terms = documents?.terms;
+  const accept = useMutation({
+    mutationFn: (documentId: string) => api.post<Profile>("/me/terms", { documentId }),
+    onSuccess: onAccepted,
+    // Newer terms went out while this page was open: show those instead.
+    onError: () => void legal.refetch(),
+  });
 
   return (
     <Card>
       <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">{terms ? `${terms.title} (v${terms.revision})` : "Terms of use"}</h2>
-        <div className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-xl bg-zinc-950 p-4 text-sm text-zinc-300">
+        <h2 className="text-lg font-semibold">{terms ? `${terms.title} · v${terms.revision}` : "Terms of use"}</h2>
+        <div className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-2xl bg-black/30 p-4 text-sm leading-relaxed text-zinc-300">
           {terms?.content ?? "Loading…"}
         </div>
-        <Button disabled={!terms || busy} onClick={() => terms && accept(terms.id)}>
-          {busy ? "Saving…" : "I accept"}
+        <Button disabled={!terms || accept.isPending} onClick={() => terms && accept.mutate(terms.id)}>
+          {accept.isPending ? <Spinner /> : "I accept"}
         </Button>
-        <ErrorText>{error}</ErrorText>
+        <ErrorText>{accept.error && errorMessage(accept.error)}</ErrorText>
       </div>
     </Card>
   );

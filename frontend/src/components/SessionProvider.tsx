@@ -1,16 +1,19 @@
 "use client";
 
 import type { PaymentReceipt, Profile, SignInResponse } from "@social-matching/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, refreshTokens, setTokens } from "@/lib/api";
 import { authenticateWithPi } from "@/lib/pi";
+import { fetchProfile, keys, useProfile } from "@/lib/queries";
 import { connectSocket, type AppSocket } from "@/lib/socket";
 
 type Status = "loading" | "signedOut" | "signedIn";
 
 interface Session {
   status: Status;
+  /** From the query cache, so every screen shares one copy. */
   profile: Profile | null;
   socket: AppSocket | null;
   setProfile: (profile: Profile) => void;
@@ -28,22 +31,23 @@ export function useSession(): Session {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<Status>("loading");
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [socket, setSocket] = useState<AppSocket | null>(null);
+  const { data: profile = null } = useProfile(status === "signedIn");
 
   // Pi reports unfinished payments during authenticate(), before we have our own tokens.
   const pendingPayments = useRef<string[]>([]);
 
   const finishSignIn = useCallback(async () => {
-    setProfile(await api.get<Profile>("/me/profile"));
+    await queryClient.fetchQuery({ queryKey: keys.profile, queryFn: fetchProfile });
     setStatus("signedIn");
 
     for (const paymentId of pendingPayments.current.splice(0)) {
       // Settles it: credits the Rolls if it was signed, cancels it if not.
       await api.post<PaymentReceipt>("/payments/complete", { paymentId }).catch(() => undefined);
     }
-  }, []);
+  }, [queryClient]);
 
   // A reload keeps the session: the refresh token survives in sessionStorage.
   useEffect(() => {
@@ -64,6 +68,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSocket(null);
     };
   }, [status]);
+
+  const setProfile = useCallback(
+    (updated: Profile) => queryClient.setQueryData(keys.profile, updated),
+    [queryClient],
+  );
 
   const signInWithPi = useCallback(async () => {
     const authResult = await authenticateWithPi((paymentId) => pendingPayments.current.push(paymentId));
@@ -86,9 +95,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (refreshToken) await api.public("/auth/signout", { refreshToken }).catch(() => undefined);
 
     setTokens(null);
-    setProfile(null);
+    // Nothing of this user's may show for the next one.
+    queryClient.clear();
     setStatus("signedOut");
-  }, []);
+  }, [queryClient]);
 
   return (
     <SessionContext.Provider value={{ status, profile, socket, setProfile, signInWithPi, devSignIn, signOut }}>
