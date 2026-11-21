@@ -109,10 +109,10 @@ export default function HomePage() {
   return (
     <Screen nav>
       <header className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-zinc-500">Hi,</p>
-          <p className="text-xl font-bold">@{profile.username}</p>
-        </div>
+        <p className="text-xl">
+          <span className="text-zinc-500">Hi, </span>
+          <span className="font-bold">@{profile.username}</span>
+        </p>
         <RollsPill available={available} held={balance.data?.held ?? 0} />
       </header>
 
