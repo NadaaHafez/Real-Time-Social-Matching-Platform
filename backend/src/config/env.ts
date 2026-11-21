@@ -25,6 +25,8 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8000),
   DATABASE_URL: z.string().min(1),
+  /** Connections this process may hold. Postgres allows 100 by default across every client. */
+  DATABASE_POOL_SIZE: z.coerce.number().int().min(5).max(100).default(10),
 
   PI_API_KEY: z.string().min(1),
   PLATFORM_API_URL: z.string().url().default("https://api.minepi.com"),
@@ -66,6 +68,7 @@ const env = {
   devToolsEnabled: !isProduction || demoMode || loadTest,
   port: raw.PORT,
   databaseUrl: raw.DATABASE_URL,
+  databasePoolSize: raw.DATABASE_POOL_SIZE,
   piApiKey: raw.PI_API_KEY,
   platformApiUrl: raw.PLATFORM_API_URL,
   jwtAccessSecret: raw.JWT_ACCESS_SECRET,

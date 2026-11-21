@@ -20,6 +20,8 @@ import { pairWaiting, WaitingTicket } from "./pairing";
  */
 
 const PASS_INTERVAL_MS = 500;
+/** Match transactions at once. A small share of the pool, so requests still get connections. */
+const MATCH_CONCURRENCY = 4;
 /** A network blip should not cost someone their search. */
 const DISCONNECT_GRACE_MS = 5_000;
 
@@ -198,34 +200,54 @@ async function runPass(): Promise<void> {
     if (ticket.expiresAt <= now) await endTicket(ticket, "expired");
   }
 
-  for (const [a, b] of pairWaiting([...waiting.values()])) {
-    // Out of the queue before the write, so the next pass cannot pick them again.
+  const pairs = pairWaiting([...waiting.values()]);
+  // Out of the queue before any write, so the next pass cannot pick them again.
+  for (const [a, b] of pairs) {
     waiting.delete(a.id);
     waiting.delete(b.id);
-
-    const { session, stillWaiting } = await matchPair(a, b);
-
-    if (!session) {
-      // One cancelled in the meantime. The other goes back in line, keeping its place.
-      for (const ticket of [a, b]) if (stillWaiting.includes(ticket.id)) waiting.set(ticket.id, ticket);
-      continue;
-    }
-
-    markOpen(session);
-    forget(a);
-    forget(b);
-
-    // Each side is told about the other.
-    for (const [me, partner] of [[a, b], [b, a]]) {
-      emitToUser(me.userId, "match:found", {
-        ticketId: me.id,
-        sessionId: session.id,
-        partner: partnerSummary({ username: partner.username, ...partner.profile }),
-      });
-    }
-
-    logger.info("Matched", { sessionId: session.id, users: [a.userId, b.userId] });
   }
+
+  // Pairs never share a user, so their transactions can run side by side.
+  let next = 0;
+  const lanes = Array.from({ length: MATCH_CONCURRENCY }, async () => {
+    while (next < pairs.length) await settlePair(...pairs[next++]);
+  });
+  await Promise.all(lanes);
+}
+
+async function settlePair(a: WaitingTicket, b: WaitingTicket): Promise<void> {
+  let result: Awaited<ReturnType<typeof matchPair>>;
+  try {
+    result = await matchPair(a, b);
+  } catch (err) {
+    // Rolled back, so both are still waiting: back in line rather than stuck on "already rolling".
+    logger.error("Match failed", { err: err instanceof Error ? err.message : String(err) });
+    waiting.set(a.id, a);
+    waiting.set(b.id, b);
+    return;
+  }
+
+  const { session, stillWaiting } = result;
+  if (!session) {
+    // One cancelled in the meantime. The other goes back in line.
+    for (const ticket of [a, b]) if (stillWaiting.includes(ticket.id)) waiting.set(ticket.id, ticket);
+    return;
+  }
+
+  markOpen(session);
+  forget(a);
+  forget(b);
+
+  // Each side is told about the other.
+  for (const [me, partner] of [[a, b], [b, a]]) {
+    emitToUser(me.userId, "match:found", {
+      ticketId: me.id,
+      sessionId: session.id,
+      partner: partnerSummary({ username: partner.username, ...partner.profile }),
+    });
+  }
+
+  logger.info("Matched", { sessionId: session.id, users: [a.userId, b.userId] });
 }
 
 let timer: NodeJS.Timeout | null = null;

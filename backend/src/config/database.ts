@@ -36,7 +36,7 @@ function softDeleteUser(base: PrismaClient) {
 
 const createPrismaClient = () => {
   const client = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: env.databaseUrl }),
+    adapter: new PrismaPg({ connectionString: env.databaseUrl, max: env.databasePoolSize }),
     // Emitted as events so they come out through our logger as single-line JSON.
     log: [
       { level: "warn", emit: "event" },

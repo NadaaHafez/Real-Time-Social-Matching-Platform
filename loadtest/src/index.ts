@@ -1,10 +1,13 @@
+import { fork, type ChildProcess } from "node:child_process";
+import { cpus } from "node:os";
+import path from "node:path";
 import { parseArgs } from "node:util";
 
-import type { QueueStats } from "@social-matching/shared";
+import type { QueueStats, SignInResponse } from "@social-matching/shared";
 
 import { request } from "./api";
-import { Bot, type BotState } from "./bot";
-import { counters, errorCount, hasError, printReport } from "./stats";
+import { errorCount, hasError, merge, printReport, type Counters } from "./stats";
+import type { ParentMessage, ProgressMessage, WorkerMessage } from "./worker";
 
 const { values: args } = parseArgs({
   options: {
@@ -13,6 +16,7 @@ const { values: args } = parseArgs({
     minutes: { type: "string", default: "2" },
     ramp: { type: "string", default: "30" },
     pace: { type: "string", default: "1" },
+    workers: { type: "string" },
     cleanup: { type: "boolean", default: false },
     "cleanup-only": { type: "boolean", default: false },
   },
@@ -23,10 +27,36 @@ const botCount = Number(args.bots);
 const runMs = Number(args.minutes) * 60_000;
 const rampMs = Number(args.ramp) * 1_000;
 const pace = Number(args.pace);
+// About 500 bots per process keeps each event loop idle enough to measure honestly.
+const workerCount = Number(args.workers ?? Math.max(1, Math.min(cpus().length - 1, Math.ceil(botCount / 500))));
 
 async function deleteBots(): Promise<void> {
   const { deleted } = await request<{ deleted: number }>(url, "DELETE", "/dev/bots");
   console.log(`Deleted ${deleted} bot accounts.`);
+}
+
+/** An extra account that only asks the server how many are searching. */
+async function watchQueue(runId: string): Promise<() => Promise<string>> {
+  const signIn = () =>
+    request<SignInResponse>(url, "POST", "/dev/signin", { body: { username: `bot_${runId}_watch` } }).then(
+      (res) => res.tokens.accessToken,
+    );
+  let token = await signIn();
+  return async () => {
+    try {
+      return String((await request<QueueStats>(url, "GET", "/matchmaking/queue", { token })).waiting);
+    } catch {
+      token = await signIn().catch(() => token);
+      return "?";
+    }
+  };
+}
+
+function startWorker(message: ParentMessage, onMessage: (message: WorkerMessage) => void): ChildProcess {
+  const child = fork(path.join(__dirname, "worker.ts"), [], { execArgv: ["-r", "ts-node/register/transpile-only"] });
+  child.on("message", onMessage);
+  child.send(message);
+  return child;
 }
 
 async function main(): Promise<void> {
@@ -34,60 +64,63 @@ async function main(): Promise<void> {
 
   // Unique per run, so each run starts with fresh accounts. Fits the 30-char username limit.
   const runId = Date.now().toString(36).slice(-5);
-  console.log(`${botCount} bots → ${url} for ${args.minutes} min (ramp ${args.ramp}s, pace ${pace}). Ctrl+C stops early.\n`);
+  console.log(
+    `${botCount} bots in ${workerCount} processes → ${url} for ${args.minutes} min ` +
+      `(ramp ${args.ramp}s, pace ${pace}). Ctrl+C stops early.\n`,
+  );
+  const queueSize = await watchQueue(runId);
 
-  const bots: Bot[] = [];
-  const runs: Promise<void>[] = [];
+  const latest = new Map<number, ProgressMessage>();
+  const finished: Promise<void>[] = [];
+  const workers: ChildProcess[] = [];
+  const perWorker = Math.ceil(botCount / workerCount);
+
+  for (let w = 0; w < workerCount; w++) {
+    const from = w * perWorker;
+    const count = Math.min(perWorker, botCount - from);
+    if (count <= 0) break;
+    finished.push(
+      new Promise((resolve) => {
+        workers.push(
+          startWorker({ type: "start", url, runId, pace, rampMs, from, count }, (message) => {
+            if (message.type === "progress") latest.set(w, message);
+            else {
+              merge(message.snapshot);
+              resolve();
+            }
+          }),
+        );
+      }),
+    );
+  }
+
   const startedAt = Date.now();
-  let stopping = false;
-  let markStopped = () => {};
-  const stopped = new Promise<void>((resolve) => (markStopped = resolve));
+  const progress = setInterval(async () => {
+    const reports = [...latest.values()];
+    const sum = (pick: (r: ProgressMessage) => number) => reports.reduce((total, r) => total + pick(r), 0);
+    const total = (key: keyof Counters) => sum((r) => r.counters[key]);
+    const state = (name: keyof ProgressMessage["states"]) => sum((r) => r.states[name] ?? 0);
+    const lag = Math.max(0, ...reports.map((r) => r.lagMs));
 
+    console.log(
+      `[${Math.round((Date.now() - startedAt) / 1000)}s] ` +
+        `rolling ${state("rolling")}, chatting ${state("chatting")}, idle ${state("idle")}, starting ${state("starting")}  ` +
+        `server queue ${await queueSize()}  rolls ${total("rolls")}  matches ${total("matches")}  ` +
+        `messages ${total("messagesSent")}  errors ${sum((r) => errorCount(r.errors))}  bot lag ${Math.round(lag)}ms`,
+    );
+  }, 5_000);
+
+  let stopping = false;
   const stop = () => {
     if (stopping) return;
     stopping = true;
-    markStopped();
     console.log("\nStopping: cancelling searches and leaving chats…");
-    bots.forEach((bot) => bot.stop());
+    workers.forEach((worker) => worker.send({ type: "stop" } satisfies ParentMessage));
   };
   process.once("SIGINT", stop);
   const timer = setTimeout(stop, runMs);
 
-  // Bots join gradually, like people opening the app, not all in the same millisecond.
-  const ramp = (async () => {
-    for (let i = 0; i < botCount && !stopping; i++) {
-      const bot = new Bot({ url, username: `bot_${runId}_${i}`, pace });
-      bots.push(bot);
-      runs.push(bot.run());
-      await new Promise((resolve) => setTimeout(resolve, rampMs / botCount));
-    }
-  })();
-
-  const progress = setInterval(async () => {
-    const states: Partial<Record<BotState, number>> = {};
-    bots.forEach((bot) => (states[bot.state] = (states[bot.state] ?? 0) + 1));
-
-    // What the server thinks is waiting, asked by any signed-in bot.
-    let waiting = "?";
-    const token = bots.find((bot) => bot.accessToken)?.accessToken;
-    if (token) {
-      waiting = await request<QueueStats>(url, "GET", "/matchmaking/queue", { token }).then(
-        (q) => String(q.waiting),
-        () => "?",
-      );
-    }
-
-    const elapsed = Math.round((Date.now() - startedAt) / 1000);
-    console.log(
-      `[${elapsed}s] bots ${bots.length} (rolling ${states.rolling ?? 0}, chatting ${states.chatting ?? 0}, ` +
-        `idle ${states.idle ?? 0}, starting ${states.starting ?? 0})  server queue ${waiting}  ` +
-        `rolls ${counters.rolls}  matches ${counters.matches}  messages ${counters.messagesSent}  errors ${errorCount()}`,
-    );
-  }, 5_000);
-
-  await ramp;
-  await stopped;
-  await Promise.all(runs);
+  await Promise.all(finished);
   clearTimeout(timer);
   clearInterval(progress);
 

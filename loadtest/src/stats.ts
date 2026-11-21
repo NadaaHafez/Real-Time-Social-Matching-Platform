@@ -1,4 +1,4 @@
-/** Counters and latency samples shared by every bot in this process. */
+/** Counters and latency samples for this process. Workers send theirs to the parent, which merges them. */
 
 export const counters = {
   signIns: 0,
@@ -11,9 +11,16 @@ export const counters = {
   /** Sent into a chat the partner had just left. */
   races: 0,
 };
+export type Counters = typeof counters;
 
 const samples = new Map<string, number[]>();
 const errors = new Map<string, number>();
+
+export type Snapshot = {
+  counters: Counters;
+  samples: Record<string, number[]>;
+  errors: Record<string, number>;
+};
 
 export function record(name: string, ms: number): void {
   let list = samples.get(name);
@@ -25,14 +32,27 @@ export function recordError(code: string): void {
   errors.set(code, (errors.get(code) ?? 0) + 1);
 }
 
-export function errorCount(): number {
-  let total = 0;
-  for (const n of errors.values()) total += n;
-  return total;
+export function errorCount(errorMap: Record<string, number> = Object.fromEntries(errors)): number {
+  return Object.values(errorMap).reduce((sum, n) => sum + n, 0);
 }
 
 export function hasError(fragment: string): boolean {
   return [...errors.keys()].some((code) => code.includes(fragment));
+}
+
+export function snapshot(withSamples: boolean): Snapshot {
+  return {
+    counters: { ...counters },
+    samples: withSamples ? Object.fromEntries(samples) : {},
+    errors: Object.fromEntries(errors),
+  };
+}
+
+/** Adds a worker's final numbers to this process's. */
+export function merge(other: Snapshot): void {
+  for (const key of Object.keys(counters) as (keyof Counters)[]) counters[key] += other.counters[key];
+  for (const [name, list] of Object.entries(other.samples)) for (const ms of list) record(name, ms);
+  for (const [code, n] of Object.entries(other.errors)) errors.set(code, (errors.get(code) ?? 0) + n);
 }
 
 function percentile(sorted: number[], p: number): number {
